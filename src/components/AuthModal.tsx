@@ -8,7 +8,7 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const { login, register, switchRoleDemo } = useApp();
+  const { login, adminLogin, register, switchRoleDemo, setActiveTab } = useApp();
   const [mode, setMode] = useState<'signin' | 'register'>('signin');
   const [role, setRole] = useState<'applicant' | 'admin'>('applicant');
   
@@ -26,7 +26,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
     try {
       if (mode === 'signin') {
-        await login(email, role);
+        if (role === 'admin' || email.trim().toLowerCase() === 'admin@whfs.org') {
+          const success = await adminLogin(email, password);
+          if (success) {
+            setActiveTab('admin');
+            onClose();
+          }
+          return;
+        } else {
+          await login(email, role);
+        }
       } else {
         await register(name, email, country, role);
       }
@@ -38,6 +47,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
   const handleQuickDemo = (targetRole: 'applicant' | 'admin') => {
     switchRoleDemo(targetRole);
+    if (targetRole === 'admin') {
+      setActiveTab('admin');
+    }
     onClose();
   };
 

@@ -10,10 +10,7 @@ export const MobileBottomNav: React.FC = () => {
     { id: 'apply', label: 'Apply', icon: FileText },
     { id: 'track', label: 'Track', icon: Search },
     { id: 'donate', label: 'Donate', icon: HeartHandshake },
-    ...(currentUser?.role === 'admin' 
-      ? [{ id: 'admin', label: 'Admin', icon: ShieldCheck }]
-      : []
-    )
+    { id: 'admin', label: 'Admin', icon: ShieldCheck }
   ];
 
   return (

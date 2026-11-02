@@ -104,20 +104,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenFirebaseModal, onOpenAuthM
               <span>Firebase Ready</span>
             </button>
 
-            {/* If Admin, show link to dashboard */}
-            {currentUser?.role === 'admin' && (
-              <button
-                onClick={() => handleNavClick('admin')}
-                className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-                  activeTab === 'admin'
-                    ? 'bg-[#0a1f38] text-amber-400'
-                    : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
-                }`}
-              >
-                <ShieldCheck className="w-4 h-4 text-amber-500" />
-                <span>Admin Portal</span>
-              </button>
-            )}
+            {/* Admin Portal button */}
+            <button
+              onClick={() => handleNavClick('admin')}
+              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
+                activeTab === 'admin'
+                  ? 'bg-[#0a1f38] text-amber-400 shadow-xs'
+                  : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4 text-amber-600" />
+              <span>Admin Portal</span>
+            </button>
 
             {/* Primary Action Button: Donate */}
             <button
@@ -285,15 +283,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenFirebaseModal, onOpenAuthM
                 </button>
               );
             })}
-            {currentUser?.role === 'admin' && (
-              <button
-                onClick={() => handleNavClick('admin')}
-                className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold bg-amber-100 text-amber-950 flex items-center gap-2 cursor-pointer"
-              >
-                <ShieldCheck className="w-4 h-4 text-amber-700" />
-                <span>Admin Dashboard</span>
-              </button>
-            )}
+            <button
+              onClick={() => handleNavClick('admin')}
+              className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-between cursor-pointer ${
+                activeTab === 'admin'
+                  ? 'bg-amber-100 text-amber-950 font-bold'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-amber-600" />
+                <span>Admin Portal (/admin)</span>
+              </div>
+              {activeTab === 'admin' && <span className="text-xs text-[#059669] font-bold">Active</span>}
+            </button>
           </div>
 
           <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-2">

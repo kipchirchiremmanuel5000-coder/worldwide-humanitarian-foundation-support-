@@ -31,6 +31,7 @@ interface AppContextType {
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   removeToast: (id: string) => void;
   login: (email: string, role?: 'applicant' | 'admin') => Promise<boolean>;
+  adminLogin: (email: string, password: string) => Promise<boolean>;
   register: (name: string, email: string, country: string, role?: 'applicant' | 'admin') => Promise<boolean>;
   logout: () => void;
   switchRoleDemo: (role: 'applicant' | 'admin') => void;
@@ -41,6 +42,8 @@ interface AppContextType {
     officerNotes?: string, 
     amountAwardedUSD?: number
   ) => void;
+  approveApplication: (id: string, amount?: number) => void;
+  rejectApplication: (id: string, reason?: string) => void;
   recordDonation: (data: Omit<DonationRecord, 'id' | 'date' | 'receiptNumber'>) => Promise<DonationRecord>;
   refreshData: () => void;
   stats: {
@@ -49,13 +52,15 @@ interface AppContextType {
     approvedOrDisbursed: number;
     totalDisbursedUSD: number;
     totalDonationsUSD: number;
+    livesImpacted: string;
   };
 }
 
 const STORAGE_KEYS = {
   USER: 'whfs_auth_user',
   APPLICATIONS: 'whfs_applications_db',
-  DONATIONS: 'whfs_donations_db'
+  DONATIONS: 'whfs_donations_db',
+  ADMIN_AUTH: 'whfs_admin_authenticated'
 };
 
 const DEFAULT_DEMO_APPLICANT: UserProfile = {
@@ -107,10 +112,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  const [activeTab, setActiveTabState] = useState<string>('home');
+  const [activeTab, setActiveTabState] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      if (path === '/admin' || path.startsWith('/admin')) {
+        return 'admin';
+      }
+      const hash = window.location.hash;
+      if (hash === '#admin' || hash === '#/admin') {
+        return 'admin';
+      }
+    }
+    return 'home';
+  });
   const [selectedTrackingId, setSelectedTrackingId] = useState<string | null>(null);
   const [preselectedProgramme, setPreselectedProgramme] = useState<{ name: string; category: ProgrammeCategory } | null>(null);
   const [toasts, setToasts] = useState<ToastState[]>([]);
+
+  // Listen for browser navigation changes (Back/Forward buttons)
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      if (path === '/admin' || path.startsWith('/admin') || window.location.hash === '#admin' || window.location.hash === '#/admin') {
+        setActiveTabState('admin');
+      } else {
+        const route = path.replace('/', '').trim() || 'home';
+        setActiveTabState(route);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Sync to local storage
   useEffect(() => {
@@ -119,6 +151,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser));
       } else {
         localStorage.removeItem(STORAGE_KEYS.USER);
+        localStorage.removeItem(STORAGE_KEYS.ADMIN_AUTH);
       }
     } catch (e) {
       console.warn('Storage sync failed:', e);
@@ -158,20 +191,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const adminLogin = async (email: string, password: string): Promise<boolean> => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail === 'admin@whfs.org' && password === 'WHFS2026!') {
+      const adminUser: UserProfile = {
+        id: 'admin-whfs-01',
+        name: 'Executive Foundation Officer',
+        email: 'admin@whfs.org',
+        role: 'admin',
+        country: 'Switzerland',
+        organization: 'WHFS International Board of Trustees',
+        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80'
+      };
+      setCurrentUser(adminUser);
+      localStorage.setItem(STORAGE_KEYS.ADMIN_AUTH, 'true');
+      showToast('Admin authentication verified. Welcome, Executive Officer.', 'success');
+      return true;
+    } else {
+      showToast('Invalid admin credentials. Use admin@whfs.org and WHFS2026!', 'error');
+      return false;
+    }
+  };
+
   const login = async (email: string, role: 'applicant' | 'admin' = 'applicant'): Promise<boolean> => {
     const normalizedEmail = email.trim().toLowerCase();
     let user: UserProfile;
 
     if (role === 'admin' || normalizedEmail.includes('admin') || normalizedEmail.includes('whfs-aid.org')) {
       user = {
-        id: 'admin-' + Math.random().toString(36).substring(2, 7),
-        name: 'Dr. Tariq Al-Hassan',
-        email: normalizedEmail || 'tariq.hassan@whfs-aid.org',
+        id: 'admin-whfs-01',
+        name: 'Executive Foundation Officer',
+        email: normalizedEmail || 'admin@whfs.org',
         role: 'admin',
         country: 'Switzerland',
         organization: 'WHFS International Board'
       };
-      showToast('Welcome back, Foundation Officer Al-Hassan', 'success');
+      showToast('Welcome back, Foundation Officer', 'success');
     } else {
       user = {
         id: 'user-' + Math.random().toString(36).substring(2, 7),
@@ -202,6 +257,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const logout = () => {
     setCurrentUser(null);
+    localStorage.removeItem(STORAGE_KEYS.ADMIN_AUTH);
     showToast('You have been signed out', 'info');
     if (activeTab === 'admin') {
       setActiveTab('home');
@@ -211,9 +267,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const switchRoleDemo = (role: 'applicant' | 'admin') => {
     if (role === 'admin') {
       setCurrentUser(DEFAULT_DEMO_ADMIN);
+      localStorage.setItem(STORAGE_KEYS.ADMIN_AUTH, 'true');
       showToast('Switched to Administrator / Foundation Officer view', 'info');
     } else {
       setCurrentUser(DEFAULT_DEMO_APPLICANT);
+      localStorage.removeItem(STORAGE_KEYS.ADMIN_AUTH);
       showToast('Switched to Applicant Portal view', 'info');
     }
   };
@@ -310,6 +368,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(`Application ${id} updated to "${newStatus}"`, 'success');
   };
 
+  const approveApplication = (id: string, amount?: number) => {
+    const today = new Date().toISOString().split('T')[0];
+    setApplications(prev => prev.map(app => {
+      if (app.id !== id) return app;
+      const awarded = amount !== undefined ? amount : (app.amountRequestedUSD || 2500);
+      const newEvent = {
+        date: today,
+        title: 'Grant Proposal Approved',
+        description: `Executive Grant Committee approved full aid allocation of $${awarded.toLocaleString()} USD.`,
+        officer: currentUser?.name || 'Executive Foundation Officer'
+      };
+      return {
+        ...app,
+        status: 'Approved' as ApplicationStatus,
+        amountAwardedUSD: awarded,
+        committeeNotes: 'Application approved by Foundation Review Board. Dispatches authorized pursuant to compliance criteria.',
+        updatedAt: new Date().toISOString(),
+        timeline: [newEvent, ...app.timeline]
+      };
+    }));
+    showToast(`Application ${id} has been Approved!`, 'success');
+  };
+
+  const rejectApplication = (id: string, reason?: string) => {
+    const today = new Date().toISOString().split('T')[0];
+    setApplications(prev => prev.map(app => {
+      if (app.id !== id) return app;
+      const rejectionReason = reason || 'Proposal does not satisfy current cohort regional allocation criteria.';
+      const newEvent = {
+        date: today,
+        title: 'Application Rejected',
+        description: rejectionReason,
+        officer: currentUser?.name || 'Executive Foundation Officer'
+      };
+      return {
+        ...app,
+        status: 'Rejected' as ApplicationStatus,
+        committeeNotes: rejectionReason,
+        updatedAt: new Date().toISOString(),
+        timeline: [newEvent, ...app.timeline]
+      };
+    }));
+    showToast(`Application ${id} has been marked as Rejected.`, 'info');
+  };
+
   const recordDonation = async (data: Omit<DonationRecord, 'id' | 'date' | 'receiptNumber'>): Promise<DonationRecord> => {
     const recNumber = `REC-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
     const newDonation: DonationRecord = {
@@ -331,12 +434,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Aggregated Stats
+  const approvedCount = applications.filter(a => a.status === 'Approved' || a.status === 'Disbursed').length;
+  const computedLives = 485000 + (approvedCount * 1250);
   const stats = {
     totalApplications: applications.length,
     pendingReview: applications.filter(a => a.status === 'Submitted' || a.status === 'Under Review').length,
-    approvedOrDisbursed: applications.filter(a => a.status === 'Approved' || a.status === 'Disbursed').length,
+    approvedOrDisbursed: approvedCount,
     totalDisbursedUSD: applications.reduce((sum, a) => sum + (a.amountAwardedUSD || 0), 0),
-    totalDonationsUSD: donations.reduce((sum, d) => sum + d.amount, 0)
+    totalDonationsUSD: donations.reduce((sum, d) => sum + d.amount, 0),
+    livesImpacted: `${computedLives.toLocaleString()}+`
   };
 
   return (
@@ -354,11 +460,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast,
       removeToast,
       login,
+      adminLogin,
       register,
       logout,
       switchRoleDemo,
       submitApplication,
       updateApplicationStatus,
+      approveApplication,
+      rejectApplication,
       recordDonation,
       refreshData,
       stats
