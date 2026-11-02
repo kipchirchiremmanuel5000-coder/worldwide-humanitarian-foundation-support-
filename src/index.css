@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: 'Playfair Display', Georgia, Cambria, serif;
+}
+
+:root {
+  --navy-primary: #0a1f38;
+  --navy-deep: #061324;
+  --navy-card: #0f2c4e;
+  --green-primary: #059669;
+  --green-hover: #047857;
+  --gold-primary: #d97706;
+  --gold-accent: #f59e0b;
+}
+
+/* Custom scrollbar and utilities */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Form input styling consistency */
+input, select, textarea {
+  font-family: inherit;
+}

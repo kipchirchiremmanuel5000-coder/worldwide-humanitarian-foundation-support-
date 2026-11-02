@@ -1,0 +1,6 @@
+{
+  "name": "WHFS - Worldwide Humanitarian Foundation Support",
+  "description": "Education • Opportunity • Brighter Futures. Official portal for humanitarian assistance, global educational scholarships, applicant tracking, donations, and grant administration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
