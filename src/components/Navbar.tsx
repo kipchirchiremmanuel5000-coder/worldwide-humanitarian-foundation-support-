@@ -24,12 +24,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenFirebaseModal, onOpenAuthM
     activeTab, 
     setActiveTab, 
     currentUser, 
-    logout, 
-    switchRoleDemo 
+    logout 
   } = useApp();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+
+  // Security Gate: Only show Admin affordances if user email is admin@whfs.org or authorized admin email or role === 'admin'
+  const isAdmin = currentUser?.email === 'admin@whfs.org' || currentUser?.email === 'kipchirchiremmanuel5000@gmail.com' || currentUser?.role === 'admin';
 
   const navLinks = [
     { id: 'home', label: 'Home' },
@@ -104,18 +106,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenFirebaseModal, onOpenAuthM
               <span>Firebase Ready</span>
             </button>
 
-            {/* Admin Portal button */}
-            <button
-              onClick={() => handleNavClick('admin')}
-              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-                activeTab === 'admin'
-                  ? 'bg-[#0a1f38] text-amber-400 shadow-xs'
-                  : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
-              }`}
-            >
-              <ShieldCheck className="w-4 h-4 text-amber-600" />
-              <span>Admin Portal</span>
-            </button>
+            {/* Admin Portal button - visible ONLY to authorized administrators */}
+            {isAdmin && (
+              <button
+                onClick={() => handleNavClick('admin')}
+                className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
+                  activeTab === 'admin'
+                    ? 'bg-[#0a1f38] text-amber-400 shadow-xs'
+                    : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4 text-amber-600" />
+                <span>Admin Portal</span>
+              </button>
+            )}
 
             {/* Primary Action Button: Donate */}
             <button
@@ -163,30 +167,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenFirebaseModal, onOpenAuthM
                     </div>
 
                     <div className="py-1">
-                      {currentUser.role === 'applicant' ? (
+                      {/* Only show Switch to Admin Mode if user is admin */}
+                      {isAdmin && (
                         <button
                           onClick={() => {
-                            switchRoleDemo('admin');
+                            handleNavClick('admin');
                             setUserDropdownOpen(false);
                           }}
-                          className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                          className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer font-semibold"
                         >
                           <ShieldCheck className="w-4 h-4 text-amber-600" />
                           <span>Switch to Admin Mode</span>
                         </button>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            switchRoleDemo('applicant');
-                            setUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
-                        >
-                          <User className="w-4 h-4 text-emerald-600" />
-                          <span>Switch to Applicant Mode</span>
-                        </button>
                       )}
 
+                      {/* Normal applicants see ONLY My Tracked Applications & Sign Out */}
                       <button
                         onClick={() => {
                           handleNavClick('track');
@@ -198,7 +193,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenFirebaseModal, onOpenAuthM
                         <span>My Tracked Applications</span>
                       </button>
 
-                      {currentUser.role === 'admin' && (
+                      {isAdmin && (
                         <button
                           onClick={() => {
                             handleNavClick('admin');
@@ -283,20 +278,22 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenFirebaseModal, onOpenAuthM
                 </button>
               );
             })}
-            <button
-              onClick={() => handleNavClick('admin')}
-              className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-between cursor-pointer ${
-                activeTab === 'admin'
-                  ? 'bg-amber-100 text-amber-950 font-bold'
-                  : 'text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-amber-600" />
-                <span>Admin Portal (/admin)</span>
-              </div>
-              {activeTab === 'admin' && <span className="text-xs text-[#059669] font-bold">Active</span>}
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => handleNavClick('admin')}
+                className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-between cursor-pointer ${
+                  activeTab === 'admin'
+                    ? 'bg-amber-100 text-amber-950 font-bold'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-amber-600" />
+                  <span>Admin Portal (/admin)</span>
+                </div>
+                {activeTab === 'admin' && <span className="text-xs text-[#059669] font-bold">Active</span>}
+              </button>
+            )}
           </div>
 
           <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-2">

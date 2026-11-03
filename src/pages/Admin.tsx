@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   ShieldCheck, 
@@ -19,9 +19,32 @@ import {
   HeartHandshake,
   ArrowLeft,
   X,
-  Check
+  Check,
+  Coins,
+  Globe,
+  CreditCard,
+  ArrowDownToLine,
+  ArrowUpRight,
+  Wallet,
+  Banknote,
+  Landmark,
+  Smartphone,
+  Send,
+  History,
+  SlidersHorizontal,
+  Filter,
+  Clock,
+  Building2,
+  Sparkles
 } from 'lucide-react';
-import { HumanitarianApplication, ApplicationStatus } from '../types';
+import { 
+  HumanitarianApplication, 
+  ApplicationStatus,
+  RegistrationFeePayment,
+  PayoutAccountSettings,
+  WithdrawalRecord
+} from '../types';
+import { getCurrency, formatFundingDisplay } from '../data/allCurrencies';
 
 interface AdminProps {
   onOpenFirebaseModal?: () => void;
@@ -31,6 +54,14 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
   const { 
     applications, 
     donations, 
+    payments,
+    withdrawals,
+    payoutSettings,
+    financialMetrics,
+    updatePaymentStatus,
+    updatePayoutSettings,
+    requestWithdrawal,
+    updateWithdrawalStatus,
     stats, 
     updateApplicationStatus, 
     approveApplication,
@@ -51,11 +82,85 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Dashboard state
-  const [activeTab, setActiveDashboardTab] = useState<'applications' | 'donations' | 'firebase'>('applications');
+  const [activeTab, setActiveDashboardTab] = useState<'applications' | 'payments' | 'donations' | 'firebase'>('applications');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [selectedApp, setSelectedApp] = useState<HumanitarianApplication | null>(null);
+
+  // Payments & Withdrawals State
+  const [paymentSearchQuery, setPaymentSearchQuery] = useState('');
+  const [paymentCountryFilter, setPaymentCountryFilter] = useState<string>('all');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('all');
+  const [activePaymentSubTab, setActivePaymentSubTab] = useState<'collection' | 'withdrawal' | 'settings'>('collection');
+
+  // Payment Methods Setup Form State
+  const [payoutForm, setPayoutForm] = useState<PayoutAccountSettings>(payoutSettings);
+  const [isSavingPayoutSettings, setIsSavingPayoutSettings] = useState(false);
+
+  // Keep payout form in sync when settings update
+  useEffect(() => {
+    if (payoutSettings) {
+      setPayoutForm(payoutSettings);
+    }
+  }, [payoutSettings]);
+
+  // Withdrawal Center State & Modal
+  const [isWithdrawalModalOpen, setIsWithdrawalModalOpen] = useState(false);
+  const [withdrawAmountUSD, setWithdrawAmountUSD] = useState<number>(250);
+  const [withdrawMethod, setWithdrawMethod] = useState<WithdrawalRecord['method']>('Airtel Money');
+  const [withdrawRecipient, setWithdrawRecipient] = useState<string>('Kondwani Mulenga (Disbursement Liaison)');
+  const [withdrawAccount, setWithdrawAccount] = useState<string>(payoutSettings?.airtelMoneyNumber || '+260 97 458 9210');
+  const [withdrawNotes, setWithdrawNotes] = useState<string>('Disbursal for Lusaka students equipment and transit allowances');
+  const [isExecutingWithdrawal, setIsExecutingWithdrawal] = useState(false);
+
+  // Update destination account field dynamically when method changes
+  const handleWithdrawMethodChange = (newMethod: WithdrawalRecord['method']) => {
+    setWithdrawMethod(newMethod);
+    if (newMethod === 'Airtel Money') {
+      setWithdrawAccount(payoutSettings.airtelMoneyNumber || '+260 97 458 9210');
+    } else if (newMethod === 'MTN Mobile Money') {
+      setWithdrawAccount(payoutSettings.mtnMoneyNumber || '+260 96 312 8904');
+    } else if (newMethod === 'Bank Transfer') {
+      setWithdrawAccount(`${payoutSettings.bankName} - Acc #${payoutSettings.bankAccountNumber}`);
+    } else if (newMethod === 'PayPal') {
+      setWithdrawAccount(payoutSettings.paypalEmail || 'treasury@whfs.org');
+    } else if (newMethod === 'M-Pesa') {
+      setWithdrawAccount(payoutSettings.mpesaNumber || '+254 712 345 678');
+    }
+  };
+
+  const handleExecuteWithdrawal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!withdrawAmountUSD || withdrawAmountUSD <= 0) {
+      showToast('Please specify a positive withdrawal amount.', 'error');
+      return;
+    }
+    if (withdrawAmountUSD > financialMetrics.currentBalanceUSD) {
+      showToast(`Cannot withdraw $${withdrawAmountUSD}. Available balance is $${financialMetrics.currentBalanceUSD.toLocaleString()} USD`, 'error');
+      return;
+    }
+    if (!withdrawAccount.trim()) {
+      showToast('Please specify a destination account or phone number.', 'error');
+      return;
+    }
+
+    setIsExecutingWithdrawal(true);
+    try {
+      await requestWithdrawal({
+        amountUSD: Number(withdrawAmountUSD),
+        method: withdrawMethod,
+        destinationAccount: withdrawAccount,
+        recipientName: withdrawRecipient || 'Executive Payout Officer',
+        notes: withdrawNotes
+      });
+      setIsWithdrawalModalOpen(false);
+    } catch {
+      // Toast message is handled inside requestWithdrawal
+    } finally {
+      setIsExecutingWithdrawal(false);
+    }
+  };
 
   // Review & Evaluation state
   const [editStatus, setEditStatus] = useState<ApplicationStatus>('Approved');
@@ -77,12 +182,7 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
     }
   };
 
-  const handleFillDemoCredentials = () => {
-    setLoginEmail('admin@whfs.org');
-    setLoginPassword('WHFS2026!');
-    setLoginError(null);
-    showToast('Admin credentials loaded: admin@whfs.org / WHFS2026!', 'info');
-  };
+
 
   const handleOpenReview = (app: HumanitarianApplication) => {
     setSelectedApp(app);
@@ -146,7 +246,8 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
   };
 
   // 1. PROTECTED ROUTE GATEWAY: Require Admin Authentication
-  if (!currentUser || currentUser.role !== 'admin') {
+  const isAuthorizedAdmin = currentUser?.email === 'admin@whfs.org' || currentUser?.email === 'kipchirchiremmanuel5000@gmail.com' || currentUser?.role === 'admin';
+  if (!currentUser || !isAuthorizedAdmin) {
     return (
       <div className="min-h-[82vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-slate-50">
         <div className="max-w-md w-full space-y-6 animate-in fade-in">
@@ -170,25 +271,15 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
           {/* Secure Login Card */}
           <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
             
-            {/* Credentials Callout Card */}
-            <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-bold uppercase tracking-wider text-[11px] text-amber-900 flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-amber-700" />
-                  Official Admin Credentials
-                </span>
-                <button
-                  type="button"
-                  onClick={handleFillDemoCredentials}
-                  className="text-[11px] font-bold text-amber-800 underline hover:text-amber-950 cursor-pointer"
-                >
-                  Auto-Fill Credentials
-                </button>
+            {/* Officer Access Notice */}
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-1.5">
+              <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-[11px] text-[#0a1f38]">
+                <Lock className="w-3.5 h-3.5 text-amber-600" />
+                <span>Authorized Administrative Access Only</span>
               </div>
-              <div className="font-mono text-[11px] space-y-0.5 pt-1 text-slate-800 bg-white/70 p-2.5 rounded-lg border border-amber-200/60">
-                <p>Email: <strong className="text-[#0a1f38]">admin@whfs.org</strong></p>
-                <p>Password: <strong className="text-[#0a1f38]">WHFS2026!</strong></p>
-              </div>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Please enter your designated foundation email (<span className="font-semibold text-slate-700">kipchirchiremmanuel5000@gmail.com</span>) and administrator password to authenticate.
+              </p>
             </div>
 
             {/* Error Banner */}
@@ -423,10 +514,10 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         
         {/* Navigation Tabs */}
-        <div className="flex border-b border-slate-200 gap-6 text-xs font-bold">
+        <div className="flex border-b border-slate-200 gap-6 text-xs font-bold overflow-x-auto">
           <button
             onClick={() => setActiveDashboardTab('applications')}
-            className={`pb-3 border-b-2 transition-colors cursor-pointer ${
+            className={`pb-3 border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
               activeTab === 'applications'
                 ? 'border-[#0a1f38] text-[#0a1f38] font-extrabold'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -435,8 +526,22 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
             Aid Applications Table ({applications.length})
           </button>
           <button
+            onClick={() => setActiveDashboardTab('payments')}
+            className={`pb-3 border-b-2 transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === 'payments'
+                ? 'border-[#0a1f38] text-[#0a1f38] font-extrabold'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Wallet className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Payments & Withdrawals</span>
+            <span className="bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold">
+              ${financialMetrics.currentBalanceUSD.toLocaleString()}
+            </span>
+          </button>
+          <button
             onClick={() => setActiveDashboardTab('donations')}
-            className={`pb-3 border-b-2 transition-colors cursor-pointer ${
+            className={`pb-3 border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
               activeTab === 'donations'
                 ? 'border-[#0a1f38] text-[#0a1f38] font-extrabold'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -446,7 +551,7 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
           </button>
           <button
             onClick={() => setActiveDashboardTab('firebase')}
-            className={`pb-3 border-b-2 transition-colors cursor-pointer ${
+            className={`pb-3 border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
               activeTab === 'firebase'
                 ? 'border-[#0a1f38] text-[#0a1f38] font-extrabold'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -520,7 +625,7 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                       <th className="py-3 px-4">Application ID</th>
                       <th className="py-3 px-4">Applicant & Location</th>
                       <th className="py-3 px-4">Grant Programme</th>
-                      <th className="py-3 px-4">Funding Requested</th>
+                      <th className="py-3 px-4">Funding Requested (USD & Local)</th>
                       <th className="py-3 px-4">Decision Status</th>
                       <th className="py-3 px-4 text-center">Approve / Reject Actions</th>
                     </tr>
@@ -537,9 +642,12 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                           </span>
                         </td>
 
-                        {/* Applicant & Country */}
+                        {/* Applicant & Country with Flag */}
                         <td className="py-3.5 px-4">
-                          <p className="font-bold text-slate-900">{app.fullName}</p>
+                          <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                            <span>{app.countryFlag || getCurrency(app.country).flag}</span>
+                            <span>{app.fullName}</span>
+                          </p>
                           <p className="text-[11px] text-slate-500">{app.country} · {app.region}</p>
                           <p className="text-[10px] text-slate-400 truncate max-w-[180px]">{app.email}</p>
                         </td>
@@ -550,12 +658,15 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                           <span className="text-[10px] uppercase font-bold text-slate-400">{app.programmeCategory}</span>
                         </td>
 
-                        {/* Amount */}
+                        {/* Amount in USD and Local Currency */}
                         <td className="py-3.5 px-4 font-mono">
-                          <span className="font-bold text-slate-900">${app.amountRequestedUSD.toLocaleString()}</span>
+                          <div className="font-bold text-slate-900">${app.amountRequestedUSD.toLocaleString()} USD</div>
+                          <div className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 mt-0.5 inline-block">
+                            {app.localCurrencyDisplay || formatFundingDisplay(app.amountRequestedUSD, app.country)}
+                          </div>
                           {app.amountAwardedUSD ? (
-                            <span className="block text-[11px] text-emerald-700 font-extrabold">
-                              Awarded: ${app.amountAwardedUSD.toLocaleString()}
+                            <span className="block text-[11px] text-emerald-700 font-extrabold mt-0.5">
+                              Awarded: ${app.amountAwardedUSD.toLocaleString()} USD
                             </span>
                           ) : null}
                         </td>
@@ -702,7 +813,717 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
           </div>
         )}
 
-        {/* Tab 2: Donations Ledger */}
+        {/* Tab 2: Payments & Withdrawals Dashboard */}
+        {activeTab === 'payments' && (
+          <div className="space-y-6">
+            
+            {/* Executive Treasury Header Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              
+              {/* Card 1: Available Balance & Action */}
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-[#0a1f38] to-[#133e87] text-white shadow-md relative overflow-hidden flex flex-col justify-between">
+                <div className="absolute top-0 right-0 -mr-6 -mt-6 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl pointer-events-none" />
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] uppercase font-bold tracking-wider text-amber-400 flex items-center gap-1.5">
+                      <Wallet className="w-3.5 h-3.5" />
+                      <span>Current Treasury Balance</span>
+                    </span>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-mono px-2 py-0.5 rounded border border-emerald-400/30">
+                      1 USD = 27 ZMW 🇿🇲
+                    </span>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-3xl font-mono font-black text-white tracking-tight block">
+                      ${financialMetrics.currentBalanceUSD.toLocaleString()} USD
+                    </span>
+                    <span className="text-sm font-mono font-bold text-emerald-300 block mt-0.5">
+                      K {financialMetrics.currentBalanceZMW.toLocaleString()} ZMW
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-300 mt-1 block">
+                    Available for immediate disbursement and regional operations
+                  </span>
+                </div>
+
+                <div className="pt-4 mt-2 border-t border-white/10">
+                  <button
+                    onClick={() => setIsWithdrawalModalOpen(true)}
+                    className="w-full py-2.5 px-3 bg-[#059669] hover:bg-[#047857] active:bg-[#065f46] text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <ArrowDownToLine className="w-4 h-4" />
+                    <span>Withdraw Funds</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 2: Total Registration Fees Collected */}
+              <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      Total Fees Collected
+                    </span>
+                    <div className="p-2 bg-amber-500/10 rounded-lg text-amber-600">
+                      <Coins className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl font-mono font-extrabold text-slate-900 block">
+                      ${financialMetrics.totalCollectedUSD.toLocaleString()} USD
+                    </span>
+                    <span className="text-xs font-mono font-bold text-amber-700 block mt-0.5">
+                      K {financialMetrics.totalCollectedZMW.toLocaleString()} ZMW
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-2 flex items-center gap-1.5">
+                    <span className="text-emerald-700 font-bold">{financialMetrics.paidCount} Verified</span>
+                    <span>·</span>
+                    <span className="text-amber-700 font-bold">{financialMetrics.pendingCount} Pending</span>
+                  </div>
+                </div>
+                <div className="text-[10px] text-slate-400 pt-3 border-t border-slate-100">
+                  Document verification fees across 52 countries
+                </div>
+              </div>
+
+              {/* Card 3: Total Withdrawn */}
+              <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      Total Disbursed Payouts
+                    </span>
+                    <div className="p-2 bg-purple-500/10 rounded-lg text-purple-600">
+                      <ArrowUpRight className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-2xl font-mono font-extrabold text-slate-900 block">
+                      ${financialMetrics.totalWithdrawnUSD.toLocaleString()} USD
+                    </span>
+                    <span className="text-xs font-mono font-bold text-purple-700 block mt-0.5">
+                      K {financialMetrics.totalWithdrawnZMW.toLocaleString()} ZMW
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-2 block">
+                    {withdrawals.length} Successful institutional payouts
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-400 pt-3 border-t border-slate-100">
+                  Via Airtel Money, MTN MoMo & Bank Wire
+                </div>
+              </div>
+
+              {/* Card 4: Configured Payout Channels */}
+              <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      Active Receiving Channels
+                    </span>
+                    <div className="p-2 bg-blue-500/10 rounded-lg text-blue-600">
+                      <Landmark className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2 space-y-1 text-xs">
+                    <div className="flex items-center justify-between font-mono text-[11px]">
+                      <span className="text-slate-600">Airtel Money 🇿🇲:</span>
+                      <span className="font-bold text-slate-900 truncate max-w-[120px]">{payoutSettings.airtelMoneyNumber}</span>
+                    </div>
+                    <div className="flex items-center justify-between font-mono text-[11px]">
+                      <span className="text-slate-600">MTN MoMo 🇿🇲:</span>
+                      <span className="font-bold text-slate-900 truncate max-w-[120px]">{payoutSettings.mtnMoneyNumber}</span>
+                    </div>
+                    <div className="flex items-center justify-between font-mono text-[11px]">
+                      <span className="text-slate-600">Zanaco Bank:</span>
+                      <span className="font-bold text-slate-900 truncate max-w-[120px]">{payoutSettings.bankAccountNumber}</span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setActivePaymentSubTab('settings')}
+                  className="text-xs text-[#0a1f38] hover:underline font-bold text-left pt-2 border-t border-slate-100 cursor-pointer flex items-center gap-1"
+                >
+                  <SlidersHorizontal className="w-3 h-3" />
+                  <span>Configure Payment Methods →</span>
+                </button>
+              </div>
+
+            </div>
+
+            {/* Sub-navigation inside Payments */}
+            <div className="flex items-center gap-3 border-b border-slate-200 pb-2 text-xs font-bold">
+              <button
+                onClick={() => setActivePaymentSubTab('collection')}
+                className={`py-2 px-3.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  activePaymentSubTab === 'collection'
+                    ? 'bg-[#0a1f38] text-white shadow-xs'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Coins className="w-3.5 h-3.5 text-amber-400" />
+                <span>Payment Collection Ledger ({payments.length})</span>
+              </button>
+
+              <button
+                onClick={() => setActivePaymentSubTab('withdrawal')}
+                className={`py-2 px-3.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  activePaymentSubTab === 'withdrawal'
+                    ? 'bg-[#0a1f38] text-white shadow-xs'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <ArrowDownToLine className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Withdrawal Center ({withdrawals.length})</span>
+              </button>
+
+              <button
+                onClick={() => setActivePaymentSubTab('settings')}
+                className={`py-2 px-3.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  activePaymentSubTab === 'settings'
+                    ? 'bg-[#0a1f38] text-white shadow-xs'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-blue-400" />
+                <span>Payment Methods Setup</span>
+              </button>
+            </div>
+
+            {/* SUB-VIEW 1: Payment Collection Ledger */}
+            {activePaymentSubTab === 'collection' && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden space-y-4 p-4 sm:p-6">
+                
+                {/* Search & Filter Bar */}
+                <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between pb-4 border-b border-slate-100">
+                  <div className="flex-1 relative">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                    <input
+                      type="text"
+                      value={paymentSearchQuery}
+                      onChange={(e) => setPaymentSearchQuery(e.target.value)}
+                      placeholder="Search applicant name, email, or transaction reference..."
+                      className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Country & Currency Filter */}
+                    <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                      <Globe className="w-3.5 h-3.5 text-slate-400" />
+                      <select
+                        value={paymentCountryFilter}
+                        onChange={(e) => setPaymentCountryFilter(e.target.value)}
+                        className="py-2 px-2.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-hidden font-medium"
+                      >
+                        <option value="all">All Countries & Currencies</option>
+                        <option value="Zambia">🇿🇲 Zambia (ZMW - K)</option>
+                        <option value="Kenya">🇰🇪 Kenya (KES - KSh)</option>
+                        <option value="Nigeria">🇳🇬 Nigeria (NGN - ₦)</option>
+                        <option value="Philippines">🇵🇭 Philippines (PHP - ₱)</option>
+                        <option value="Ukraine">🇺🇦 Ukraine (UAH - ₴)</option>
+                        <option value="Jordan">🇯🇴 Jordan (JOD - JD)</option>
+                      </select>
+                    </div>
+
+                    {/* Status Filter */}
+                    <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                      <Filter className="w-3.5 h-3.5 text-slate-400" />
+                      <select
+                        value={paymentStatusFilter}
+                        onChange={(e) => setPaymentStatusFilter(e.target.value)}
+                        className="py-2 px-2.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-hidden font-medium"
+                      >
+                        <option value="all">All Statuses</option>
+                        <option value="Paid">Paid / Verified</option>
+                        <option value="Pending Verification">Pending Verification</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Table of all payments */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold">
+                      <tr>
+                        <th className="py-3 px-4">Transaction Ref & Date</th>
+                        <th className="py-3 px-4">Applicant & Country</th>
+                        <th className="py-3 px-4">Amount Paid (Local + USD)</th>
+                        <th className="py-3 px-4">Payment Method / Channel</th>
+                        <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4 text-center">Audit Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {payments
+                        .filter(p => {
+                          const matchesSearch = 
+                            p.applicantName.toLowerCase().includes(paymentSearchQuery.toLowerCase()) ||
+                            p.applicantEmail.toLowerCase().includes(paymentSearchQuery.toLowerCase()) ||
+                            p.transactionReference.toLowerCase().includes(paymentSearchQuery.toLowerCase()) ||
+                            p.id.toLowerCase().includes(paymentSearchQuery.toLowerCase());
+                          const matchesCountry = paymentCountryFilter === 'all' || p.country.toLowerCase() === paymentCountryFilter.toLowerCase();
+                          const matchesStatus = paymentStatusFilter === 'all' || p.status === paymentStatusFilter;
+                          return matchesSearch && matchesCountry && matchesStatus;
+                        })
+                        .map(payment => (
+                          <tr key={payment.id} className="hover:bg-slate-50/80 transition-colors">
+                            
+                            {/* Ref & Date */}
+                            <td className="py-3.5 px-4 font-mono font-bold text-[#0a1f38]">
+                              <span>{payment.transactionReference}</span>
+                              <span className="block font-sans text-[10px] text-slate-400 font-normal">
+                                {payment.date} · {payment.id}
+                              </span>
+                            </td>
+
+                            {/* Applicant Name & Country */}
+                            <td className="py-3.5 px-4">
+                              <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                                <span>{payment.countryFlag}</span>
+                                <span>{payment.applicantName}</span>
+                              </p>
+                              <p className="text-[11px] text-slate-500">{payment.country}</p>
+                              <p className="text-[10px] text-slate-400 truncate max-w-[180px]">{payment.applicantEmail}</p>
+                            </td>
+
+                            {/* Amount Paid (local + USD) */}
+                            <td className="py-3.5 px-4 font-mono">
+                              <span className="font-extrabold text-[#059669] text-sm block">
+                                {payment.currencySymbol} {payment.amountLocal.toLocaleString()} {payment.currencyCode}
+                              </span>
+                              <span className="text-[11px] text-slate-500">
+                                (${payment.amountUSD.toLocaleString()} USD)
+                              </span>
+                            </td>
+
+                            {/* Payment Method / Channel */}
+                            <td className="py-3.5 px-4">
+                              <span className="inline-flex items-center gap-1.5 font-semibold text-slate-800 bg-slate-100 px-2.5 py-1 rounded-md text-[11px]">
+                                {payment.paymentMethod.includes('Airtel') || payment.paymentMethod.includes('MTN') || payment.paymentMethod.includes('M-Pesa') ? (
+                                  <Smartphone className="w-3 h-3 text-emerald-600" />
+                                ) : payment.paymentMethod.includes('Bank') ? (
+                                  <Landmark className="w-3 h-3 text-blue-600" />
+                                ) : (
+                                  <CreditCard className="w-3 h-3 text-purple-600" />
+                                )}
+                                <span>{payment.paymentMethod}</span>
+                              </span>
+                            </td>
+
+                            {/* Status */}
+                            <td className="py-3.5 px-4">
+                              <span className={`inline-block text-[11px] font-bold px-2.5 py-1 rounded-md ${
+                                payment.status === 'Paid'
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                  : payment.status === 'Pending Verification'
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                    : 'bg-slate-100 text-slate-700'
+                              }`}>
+                                {payment.status}
+                              </span>
+                            </td>
+
+                            {/* Verify / Toggle Action */}
+                            <td className="py-3.5 px-4 text-center">
+                              {payment.status === 'Pending Verification' ? (
+                                <button
+                                  onClick={() => updatePaymentStatus(payment.id, 'Paid')}
+                                  className="px-3 py-1.5 bg-[#059669] hover:bg-[#047857] text-white text-[11px] font-bold rounded-lg shadow-xs cursor-pointer inline-flex items-center gap-1"
+                                >
+                                  <Check className="w-3 h-3" />
+                                  <span>Verify & Confirm</span>
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => updatePaymentStatus(payment.id, 'Pending Verification')}
+                                  title="Toggle status back to Pending"
+                                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-medium rounded border border-slate-300 cursor-pointer"
+                                >
+                                  Mark Pending
+                                </button>
+                              )}
+                            </td>
+
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {payments.length === 0 && (
+                  <div className="p-12 text-center text-slate-500 text-xs">
+                    <CreditCard className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                    <p className="font-semibold text-slate-700">No payment records yet</p>
+                    <p className="text-slate-400 mt-0.5">When real applicants submit registration fees (Airtel, MTN, M-Pesa, Bank, PayPal), records will populate here automatically.</p>
+                  </div>
+                )}
+
+              </div>
+            )}
+
+            {/* SUB-VIEW 2: Withdrawal Center */}
+            {activePaymentSubTab === 'withdrawal' && (
+              <div className="space-y-6">
+                
+                {/* Header Banner */}
+                <div className="p-6 bg-gradient-to-r from-[#0a1f38] via-[#133e87] to-[#0a1f38] rounded-2xl text-white shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <span className="text-xs uppercase font-bold text-amber-400 tracking-wider block">
+                      Institutional Payouts & Disbursal Window
+                    </span>
+                    <h3 className="text-xl font-bold font-serif text-white mt-0.5">
+                      Available Balance: ${financialMetrics.currentBalanceUSD.toLocaleString()} USD (K {financialMetrics.currentBalanceZMW.toLocaleString()} ZMW)
+                    </h3>
+                    <p className="text-xs text-slate-300 mt-1 max-w-xl">
+                      Treasury balances accumulate through verified applicant intake fees and can be released to regional bank accounts, Airtel Money, MTN MoMo, or PayPal.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => setIsWithdrawalModalOpen(true)}
+                    className="px-6 py-3 bg-[#059669] hover:bg-[#047857] text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-2 shrink-0"
+                  >
+                    <ArrowDownToLine className="w-4 h-4" />
+                    <span>Withdraw Funds</span>
+                  </button>
+                </div>
+
+                {/* Withdrawals Transaction History Table */}
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                  <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-[#0a1f38] flex items-center gap-1.5">
+                        <History className="w-4 h-4 text-emerald-600" />
+                        <span>Withdrawals & Payout Transaction History ({withdrawals.length})</span>
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        Official audit record of all funds withdrawn and disbursed to authorized field coordinators and partners.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold">
+                        <tr>
+                          <th className="py-3 px-4">Payout ID & Date</th>
+                          <th className="py-3 px-4">Disbursed Amount</th>
+                          <th className="py-3 px-4">Payout Method & Account</th>
+                          <th className="py-3 px-4">Recipient & Authorizer</th>
+                          <th className="py-3 px-4">Status</th>
+                          <th className="py-3 px-4 text-right">Reference Code</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {withdrawals.map((w) => (
+                          <tr key={w.id} className="hover:bg-slate-50/80">
+                            <td className="py-3.5 px-4 font-mono font-bold text-[#0a1f38]">
+                              <span>{w.id}</span>
+                              <span className="block font-sans text-[10px] text-slate-400 font-normal">{w.date}</span>
+                            </td>
+                            <td className="py-3.5 px-4 font-mono">
+                              <span className="text-sm font-extrabold text-[#0a1f38] block">${w.amountUSD.toLocaleString()} USD</span>
+                              <span className="text-[11px] font-bold text-emerald-700 block">K {w.amountZMW.toLocaleString()} ZMW</span>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="font-semibold text-slate-900 block">{w.method}</span>
+                              <span className="text-[11px] font-mono text-slate-500 block truncate max-w-[200px]">{w.destinationAccount}</span>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="font-semibold text-slate-800 block">{w.recipientName}</span>
+                              <span className="text-[10px] text-slate-400 block">By: {w.requestedBy}</span>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className={`inline-block text-[11px] font-bold px-2.5 py-1 rounded-md ${
+                                w.status === 'Completed'
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                  : w.status === 'Processing'
+                                    ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                                    : 'bg-amber-100 text-amber-800 border border-amber-300'
+                              }`}>
+                                {w.status}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-700 text-[11px]">
+                              {w.referenceCode}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {withdrawals.length === 0 && (
+                    <div className="p-8 text-center text-slate-500 text-xs">
+                      <p className="font-semibold text-slate-700">No withdrawal records yet</p>
+                      <p className="text-slate-400 mt-0.5">Disbursement ledger records will appear here as treasury payouts are initiated.</p>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            )}
+
+            {/* SUB-VIEW 3: Payment Methods Setup Form */}
+            {activePaymentSubTab === 'settings' && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 sm:p-8 space-y-6">
+                <div>
+                  <h3 className="text-lg font-bold font-serif text-[#0a1f38] flex items-center gap-2">
+                    <SlidersHorizontal className="w-5 h-5 text-emerald-600" />
+                    <span>Payment Methods Setup (Where Money Should Go)</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Configure the receiving destination accounts shown to applicants when paying registration fees and used for authorized treasury withdrawals.
+                  </p>
+                </div>
+
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  updatePayoutSettings(payoutForm);
+                }} className="space-y-6">
+                  
+                  {/* Section 1: Mobile Money Receivers */}
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
+                    <span className="text-xs uppercase tracking-wider text-[#0a1f38] font-bold flex items-center gap-2">
+                      <Smartphone className="w-4 h-4 text-emerald-600" />
+                      <span>1. Mobile Money Accounts (Zambia & Regional East Africa)</span>
+                    </span>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Airtel Money Number (Zambia 🇿🇲) *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={payoutForm.airtelMoneyNumber}
+                          onChange={(e) => setPayoutForm(prev => ({ ...prev, airtelMoneyNumber: e.target.value }))}
+                          placeholder="+260 97 458 9210"
+                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38] font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Airtel Account / Merchant Name
+                        </label>
+                        <input
+                          type="text"
+                          value={payoutForm.airtelAccountName}
+                          onChange={(e) => setPayoutForm(prev => ({ ...prev, airtelAccountName: e.target.value }))}
+                          placeholder="WHFS Zambia Relief Operations"
+                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          MTN Money Number (for Zambia 🇿🇲) *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={payoutForm.mtnMoneyNumber}
+                          onChange={(e) => setPayoutForm(prev => ({ ...prev, mtnMoneyNumber: e.target.value }))}
+                          placeholder="+260 96 312 8904"
+                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38] font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          MTN Account / MoMo Name
+                        </label>
+                        <input
+                          type="text"
+                          value={payoutForm.mtnAccountName}
+                          onChange={(e) => setPayoutForm(prev => ({ ...prev, mtnAccountName: e.target.value }))}
+                          placeholder="WHFS Regional Grants Desk"
+                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          M-Pesa Number (Kenya 🇰🇪)
+                        </label>
+                        <input
+                          type="text"
+                          value={payoutForm.mpesaNumber}
+                          onChange={(e) => setPayoutForm(prev => ({ ...prev, mpesaNumber: e.target.value }))}
+                          placeholder="+254 712 345 678"
+                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38] font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Airtel Kenya Number (Admin Samuel Soi 🇰🇪)
+                        </label>
+                        <input
+                          type="text"
+                          value={payoutForm.airtelKenyaNumber || '0762641585'}
+                          onChange={(e) => setPayoutForm(prev => ({ ...prev, airtelKenyaNumber: e.target.value }))}
+                          placeholder="0762641585"
+                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38] font-mono font-bold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Airtel Kenya Account Name
+                        </label>
+                        <input
+                          type="text"
+                          value={payoutForm.airtelKenyaAccountName || 'Samuel Soi'}
+                          onChange={(e) => setPayoutForm(prev => ({ ...prev, airtelKenyaAccountName: e.target.value }))}
+                          placeholder="Samuel Soi"
+                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 2: Bank Account Details */}
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
+                    <span className="text-xs uppercase tracking-wider text-[#0a1f38] font-bold flex items-center gap-2">
+                      <Landmark className="w-4 h-4 text-blue-600" />
+                      <span>2. Institutional Bank Account (Zambia & International Wires)</span>
+                    </span>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Bank Name *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={payoutForm.bankName}
+                          onChange={(e) => setPayoutForm(prev => ({ ...prev, bankName: e.target.value }))}
+                          placeholder="Zambia National Commercial Bank (Zanaco)"
+                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Account Name *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={payoutForm.bankAccountName}
+                          onChange={(e) => setPayoutForm(prev => ({ ...prev, bankAccountName: e.target.value }))}
+                          placeholder="Worldwide Humanitarian Foundation Support Trust"
+                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Account Number *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={payoutForm.bankAccountNumber}
+                          onChange={(e) => setPayoutForm(prev => ({ ...prev, bankAccountNumber: e.target.value }))}
+                          placeholder="048201948201"
+                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38] font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Branch Name / Location
+                        </label>
+                        <input
+                          type="text"
+                          value={payoutForm.bankBranch}
+                          onChange={(e) => setPayoutForm(prev => ({ ...prev, bankBranch: e.target.value }))}
+                          placeholder="Lusaka Corporate Branch, Cairo Road"
+                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          SWIFT / BIC Code *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={payoutForm.bankSwiftCode}
+                          onChange={(e) => setPayoutForm(prev => ({ ...prev, bankSwiftCode: e.target.value }))}
+                          placeholder="ZNCOZMLU"
+                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38] font-mono font-bold"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 3: PayPal & Stripe */}
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
+                    <span className="text-xs uppercase tracking-wider text-[#0a1f38] font-bold flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-purple-600" />
+                      <span>3. PayPal & Card Payment Gateways</span>
+                    </span>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          PayPal Receiving Email *
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          value={payoutForm.paypalEmail}
+                          onChange={(e) => setPayoutForm(prev => ({ ...prev, paypalEmail: e.target.value }))}
+                          placeholder="treasury@whfs.org"
+                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3 pt-6">
+                        <input
+                          type="checkbox"
+                          id="stripeActive"
+                          checked={payoutForm.stripeActive}
+                          onChange={(e) => setPayoutForm(prev => ({ ...prev, stripeActive: e.target.checked }))}
+                          className="rounded text-[#059669] focus:ring-[#059669] cursor-pointer"
+                        />
+                        <label htmlFor="stripeActive" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                          Enable Stripe / Direct Card Gateway for Global Intake
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Submit Button */}
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="submit"
+                      disabled={isSavingPayoutSettings}
+                      className="px-6 py-3 bg-[#0a1f38] hover:bg-[#133e87] text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-2"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-amber-400" />
+                      <span>{isSavingPayoutSettings ? 'Saving Settings...' : 'Save Payment Methods & Receiving Accounts'}</span>
+                    </button>
+                  </div>
+
+                </form>
+              </div>
+            )}
+
+          </div>
+        )}
+
+        {/* Tab 3: Donations Ledger */}
         {activeTab === 'donations' && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between">
@@ -840,7 +1661,10 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-2 gap-3">
                 <div>
                   <span className="text-slate-400 block">Applicant & Location:</span>
-                  <span className="font-bold text-slate-900">{selectedApp.fullName} ({selectedApp.country})</span>
+                  <span className="font-bold text-slate-900 flex items-center gap-1">
+                    <span>{selectedApp.countryFlag || getCurrency(selectedApp.country).flag}</span>
+                    <span>{selectedApp.fullName} ({selectedApp.country})</span>
+                  </span>
                 </div>
                 <div>
                   <span className="text-slate-400 block">Contact:</span>
@@ -859,8 +1683,19 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                   <span className="font-bold text-amber-700">{selectedApp.financialNeedLevel}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block">Requested Amount:</span>
-                  <span className="font-bold font-mono text-slate-900">${selectedApp.amountRequestedUSD.toLocaleString()} USD</span>
+                  <span className="text-slate-400 block">Requested Amount (USD & Local):</span>
+                  <span className="font-bold font-mono text-slate-900 block">${selectedApp.amountRequestedUSD.toLocaleString()} USD</span>
+                  <span className="text-[11px] font-semibold text-emerald-700 font-mono block">
+                    {selectedApp.localCurrencyDisplay || formatFundingDisplay(selectedApp.amountRequestedUSD, selectedApp.country)}
+                  </span>
+                </div>
+                <div className="col-span-2 pt-2 border-t border-slate-200/80 flex items-center justify-between text-[11px]">
+                  <span className="text-slate-500 font-mono">
+                    Official Exchange Rate: 1 USD = {selectedApp.localCurrencyRate || getCurrency(selectedApp.country).rate} {selectedApp.localCurrencyCode || getCurrency(selectedApp.country).code}
+                  </span>
+                  <span className="font-medium text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    Registration Fee: {selectedApp.registrationFeeLocal || `${getCurrency(selectedApp.country).symbol} ${(15 * getCurrency(selectedApp.country).rate).toLocaleString()} ${getCurrency(selectedApp.country).code}`} ($15 USD)
+                  </span>
                 </div>
               </div>
 
@@ -980,6 +1815,204 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
               </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* 3. WITHDRAWAL FUNDS MODAL */}
+      {isWithdrawalModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
+            
+            {/* Modal Header */}
+            <div className="px-6 py-4 bg-[#0a1f38] text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-lg">
+                  <ArrowDownToLine className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold font-serif text-base text-white">Execute Treasury Withdrawal</h3>
+                  <p className="text-xs text-slate-300">Disburse funds to authorized mobile money or bank accounts</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsWithdrawalModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleExecuteWithdrawal} className="p-6 overflow-y-auto space-y-4 text-xs">
+              {/* Current Balance Banner */}
+              <div className="p-3.5 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-emerald-800 tracking-wider block">Available Balance</span>
+                  <span className="text-base font-extrabold text-[#0a1f38] font-mono">
+                    ${financialMetrics.currentBalanceUSD.toLocaleString()} USD
+                  </span>
+                  <span className="text-xs font-bold text-emerald-700 block font-mono">
+                    (K {financialMetrics.currentBalanceZMW.toLocaleString()} ZMW 🇿🇲)
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-slate-500 block">Official Rate</span>
+                  <span className="text-xs font-bold text-slate-700 font-mono">1 USD = 27 ZMW</span>
+                </div>
+              </div>
+
+              {/* Amount to Withdraw */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="font-bold text-slate-800">
+                    Amount to Withdraw ($ USD) *
+                  </label>
+                  <span className="text-[11px] font-bold text-emerald-700 font-mono">
+                    = K {Math.round((withdrawAmountUSD || 0) * 27).toLocaleString()} ZMW
+                  </span>
+                </div>
+                <div className="relative">
+                  <DollarSign className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type="number"
+                    min="1"
+                    max={financialMetrics.currentBalanceUSD}
+                    required
+                    value={withdrawAmountUSD || ''}
+                    onChange={(e) => setWithdrawAmountUSD(Number(e.target.value))}
+                    className="w-full pl-9 pr-3 py-2 text-sm font-mono font-bold border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
+                  />
+                </div>
+                {/* Quick preset buttons */}
+                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                  <span className="text-[10px] text-slate-400 font-semibold mr-1">Presets:</span>
+                  {[50, 100, 250, 500].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setWithdrawAmountUSD(preset)}
+                      className={`px-2.5 py-1 text-[11px] rounded border font-mono font-semibold transition-colors cursor-pointer ${
+                        withdrawAmountUSD === preset
+                          ? 'bg-[#0a1f38] text-white border-[#0a1f38]'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      ${preset}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setWithdrawAmountUSD(financialMetrics.currentBalanceUSD)}
+                    className="px-2.5 py-1 text-[11px] rounded border font-mono font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300 cursor-pointer"
+                  >
+                    Max (${financialMetrics.currentBalanceUSD.toLocaleString()})
+                  </button>
+                </div>
+              </div>
+
+              {/* Payout Method */}
+              <div>
+                <label className="block font-bold text-slate-800 mb-1.5">
+                  Select Payout Method *
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['Airtel Money', 'MTN Mobile Money', 'Bank Transfer', 'PayPal', 'M-Pesa'] as WithdrawalRecord['method'][]).map((method) => {
+                    const isSelected = withdrawMethod === method;
+                    return (
+                      <button
+                        key={method}
+                        type="button"
+                        onClick={() => handleWithdrawMethodChange(method)}
+                        className={`p-2 rounded-lg border text-left transition-all cursor-pointer flex items-center justify-between text-xs ${
+                          isSelected
+                            ? 'border-[#0a1f38] bg-[#0a1f38]/5 ring-1 ring-[#0a1f38] text-[#0a1f38] font-bold'
+                            : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
+                        }`}
+                      >
+                        <span className="truncate">{method}</span>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 ml-1" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Destination Account / Phone Number */}
+              <div>
+                <label className="block font-bold text-slate-800 mb-1">
+                  Destination Account / Phone Number *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={withdrawAccount}
+                  onChange={(e) => setWithdrawAccount(e.target.value)}
+                  placeholder="e.g. +260 97 458 9210 or Zanaco Acc 048201948201"
+                  className="w-full p-2.5 border border-slate-300 rounded-lg font-mono focus:outline-hidden focus:border-[#0a1f38]"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Auto-populated from configured Treasury payment methods. You may also edit for one-off field dispatches.
+                </p>
+              </div>
+
+              {/* Recipient Name */}
+              <div>
+                <label className="block font-bold text-slate-800 mb-1">
+                  Recipient Name / Authorized Field Liaison *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={withdrawRecipient}
+                  onChange={(e) => setWithdrawRecipient(e.target.value)}
+                  placeholder="e.g. Kondwani Mulenga (Disbursement Liaison)"
+                  className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
+                />
+              </div>
+
+              {/* Notes / Purpose */}
+              <div>
+                <label className="block font-bold text-slate-800 mb-1">
+                  Disbursal Purpose / Reference Memo
+                </label>
+                <input
+                  type="text"
+                  value={withdrawNotes}
+                  onChange={(e) => setWithdrawNotes(e.target.value)}
+                  placeholder="e.g. Field stipend for Copperbelt emergency aid team"
+                  className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsWithdrawalModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isExecutingWithdrawal || !withdrawAmountUSD || withdrawAmountUSD <= 0 || withdrawAmountUSD > financialMetrics.currentBalanceUSD}
+                  className="px-5 py-2.5 bg-[#059669] hover:bg-[#047857] disabled:opacity-50 text-white text-xs font-bold uppercase rounded-lg shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  {isExecutingWithdrawal ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Processing Payout...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ArrowDownToLine className="w-3.5 h-3.5" />
+                      <span>Confirm & Withdraw Funds</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

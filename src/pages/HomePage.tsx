@@ -91,20 +91,6 @@ export const HomePage: React.FC = () => {
                     Track Aid
                   </button>
                 </form>
-                <div className="text-[11px] text-slate-500 mt-1.5 flex items-center gap-2">
-                  <span>Demo search:</span>
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      setQuickSearchId('WHFS-2026-AF-94821');
-                      setSelectedTrackingId('WHFS-2026-AF-94821');
-                      setActiveTab('track');
-                    }}
-                    className="font-mono text-emerald-700 underline hover:text-emerald-900 cursor-pointer"
-                  >
-                    WHFS-2026-AF-94821
-                  </button>
-                </div>
               </div>
 
             </div>

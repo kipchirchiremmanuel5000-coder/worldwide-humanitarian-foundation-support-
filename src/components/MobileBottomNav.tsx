@@ -5,13 +5,18 @@ import { Home, FileText, Search, HeartHandshake, ShieldCheck } from 'lucide-reac
 export const MobileBottomNav: React.FC = () => {
   const { activeTab, setActiveTab, currentUser } = useApp();
 
-  const items = [
+  const isAdmin = currentUser?.email === 'admin@whfs.org' || currentUser?.email === 'kipchirchiremmanuel5000@gmail.com' || currentUser?.role === 'admin';
+
+  const baseItems = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'apply', label: 'Apply', icon: FileText },
     { id: 'track', label: 'Track', icon: Search },
     { id: 'donate', label: 'Donate', icon: HeartHandshake },
-    { id: 'admin', label: 'Admin', icon: ShieldCheck }
   ];
+
+  const items = isAdmin
+    ? [...baseItems, { id: 'admin', label: 'Admin', icon: ShieldCheck }]
+    : baseItems;
 
   return (
     <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 py-1.5 px-2 shadow-lg">

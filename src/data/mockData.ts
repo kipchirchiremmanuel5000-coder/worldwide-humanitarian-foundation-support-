@@ -1,4 +1,11 @@
-import { ProgrammeItem, HumanitarianApplication, DonationRecord } from '../types';
+import { 
+  ProgrammeItem, 
+  HumanitarianApplication, 
+  DonationRecord,
+  RegistrationFeePayment,
+  PayoutAccountSettings,
+  WithdrawalRecord
+} from '../types';
 
 export const EDUCATION_PROGRAMMES: ProgrammeItem[] = [
   {
@@ -199,261 +206,18 @@ export const HUMANITARIAN_PROGRAMMES: ProgrammeItem[] = [
   }
 ];
 
-export const INITIAL_APPLICATIONS: HumanitarianApplication[] = [
-  {
-    id: 'WHFS-2026-AF-94821',
-    userId: 'user-app-01',
-    fullName: 'Amina Zainab Mwangi',
-    email: 'amina.mwangi2026@gmail.com',
-    phone: '+254 712 345 678',
-    dateOfBirth: '2004-06-14',
-    gender: 'Female',
-    country: 'Kenya',
-    region: 'Turkana County',
-    address: 'Kakuma Township, Sub-County North',
-    programmeCategory: 'education',
-    programmeName: 'Global Academic Scholarship Programme (GASP)',
-    institutionOrCommunity: 'University of Nairobi (Bachelor of Science in Civil & Environmental Engineering)',
-    financialNeedLevel: 'Critical/Emergency',
-    householdIncomeBracket: 'Under $1,200 USD annually',
-    dependentsCount: 5,
-    displacementStatus: 'Crisis Affected',
-    statementOfNeed: 'Raised in a pastoralist community repeatedly decimated by protracted droughts, I was the first girl from my sub-location to complete high school with an A- grade. My family has lost all livestock and cannot afford tertiary fees. My goal is to build sustainable water distribution networks across arid Kenyan counties.',
-    amountRequestedUSD: 3800,
-    amountAwardedUSD: 3800,
-    status: 'Approved',
-    documents: [
-      { id: 'doc-1', name: 'National_ID_Amina_Mwangi.pdf', type: 'PDF', size: '1.2 MB', status: 'verified', uploadedAt: '2026-08-10' },
-      { id: 'doc-2', name: 'KCSE_Official_Results_Certificate.pdf', type: 'PDF', size: '2.4 MB', status: 'verified', uploadedAt: '2026-08-10' },
-      { id: 'doc-3', name: 'University_Admission_Letter_UoN.pdf', type: 'PDF', size: '1.8 MB', status: 'verified', uploadedAt: '2026-08-12' },
-      { id: 'doc-4', name: 'Area_Chief_Indigency_Affidavit.pdf', type: 'PDF', size: '890 KB', status: 'verified', uploadedAt: '2026-08-12' }
-    ],
-    timeline: [
-      { date: '2026-08-10', title: 'Application Submitted', description: 'Application received and verified by international intake desk.', officer: 'System' },
-      { date: '2026-08-14', title: 'Document Verification Complete', description: 'Academic transcripts and local administrative affidavits validated with issuing institutions.', officer: 'Dr. Tariq Al-Hassan' },
-      { date: '2026-08-25', title: 'Committee Evaluation', description: 'Evaluated by the East Africa Education Steering Panel. Unanimous recommendation for full award.', officer: 'Board Review Committee' },
-      { date: '2026-09-02', title: 'Scholarship Award Approved', description: 'Grant of $3,800 USD awarded covering Year 1 tuition, laptop, and living stipend.', officer: 'Director Elena Rostova' }
-    ],
-    committeeNotes: 'Exceptional candidate with outstanding high school STEM ranking. Direct water engineering alignment with WHFS mission.',
-    createdAt: '2026-08-10T09:14:22Z',
-    updatedAt: '2026-09-02T14:30:00Z',
-    disbursementDate: '2026-09-15'
-  },
-  {
-    id: 'WHFS-2026-AS-41093',
-    userId: 'user-app-02',
-    fullName: 'Maria Santos Dela Cruz',
-    email: 'maria.santos.delacruz@outlook.ph',
-    phone: '+63 917 882 3410',
-    dateOfBirth: '1998-11-20',
-    gender: 'Female',
-    country: 'Philippines',
-    region: 'Eastern Samar',
-    address: 'Barangay San Isidro, Guiuan',
-    programmeCategory: 'humanitarian',
-    programmeName: 'Disaster Shelter & Winterization Kits',
-    institutionOrCommunity: 'San Isidro Fisherfolk Community Alliance (68 families)',
-    financialNeedLevel: 'Critical/Emergency',
-    householdIncomeBracket: 'Under $1,500 USD annually',
-    dependentsCount: 4,
-    displacementStatus: 'Internally Displaced',
-    statementOfNeed: 'Super Typhoon Hagupit destroyed 45 traditional fishing homes along the coastline of Guiuan. Families are presently living under makeshift plastic sheets prone to monsoon flooding. Urgent need for reinforced galvanized zinc roof kits, water purification tablets, and solar lanterns for school-age children.',
-    amountRequestedUSD: 6500,
-    amountAwardedUSD: 6500,
-    status: 'Disbursed',
-    documents: [
-      { id: 'doc-5', name: 'Barangay_Disaster_Assessment_Report.pdf', type: 'PDF', size: '3.1 MB', status: 'verified', uploadedAt: '2026-09-05' },
-      { id: 'doc-6', name: 'Damage_Photos_Guiuan_Coast.pdf', type: 'PDF', size: '5.4 MB', status: 'verified', uploadedAt: '2026-09-05' }
-    ],
-    timeline: [
-      { date: '2026-09-05', title: 'Emergency Aid Request Logged', description: 'Priority Tier-1 rapid disaster response protocol initiated.', officer: 'Regional Intake Philippines' },
-      { date: '2026-09-07', title: 'Field Assessment Confirmed', description: 'WHFS Manila field liaison verified structural damage across 68 coastal dwellings.', officer: 'Capt. Ramon Valdez' },
-      { date: '2026-09-09', title: 'Grant & Supply Pack Approved', description: 'Emergency emergency kit distribution approved for 68 households ($6,500 budget).', officer: 'Board Review Committee' },
-      { date: '2026-09-12', title: 'Materials Disbursed to Field Hub', description: 'Corrugated roofing, solar lanterns and hygiene kits delivered to Guiuan staging warehouse.', officer: 'Logistics Division' }
-    ],
-    committeeNotes: 'Emergency relief prioritized under immediate cyclone disaster protocols.',
-    createdAt: '2026-09-05T11:20:00Z',
-    updatedAt: '2026-09-12T16:45:00Z',
-    disbursementDate: '2026-09-12'
-  },
-  {
-    id: 'WHFS-2026-EU-78201',
-    userId: 'user-app-03',
-    fullName: 'Oleksandr Vasyliovych Kovalenko',
-    email: 'kovalenko.oleksandr.ua@gmail.com',
-    phone: '+380 50 123 4567',
-    dateOfBirth: '2005-03-08',
-    gender: 'Male',
-    country: 'Ukraine',
-    region: 'Kharkiv Region',
-    address: 'Currently displaced in Lviv Oblast',
-    programmeCategory: 'education',
-    programmeName: 'Displaced Students Educational Continuity Grant',
-    institutionOrCommunity: 'Lviv Polytechnic National University (Computer Engineering)',
-    financialNeedLevel: 'Critical/Emergency',
-    householdIncomeBracket: 'Under $2,000 USD annually',
-    dependentsCount: 3,
-    displacementStatus: 'Internally Displaced',
-    statementOfNeed: 'Our family home and university campus in Kharkiv suffered direct structural artillery damage in late 2025. Relocating to Lviv with my disabled mother, I am continuing technical coursework online and through hybrid workshops but lack funds for tuition fees, technical hardware, and accommodation costs.',
-    amountRequestedUSD: 2900,
-    status: 'Committee Evaluation',
-    documents: [
-      { id: 'doc-7', name: 'IDP_Registration_Certificate_Lviv.pdf', type: 'PDF', size: '1.1 MB', status: 'verified', uploadedAt: '2026-10-02' },
-      { id: 'doc-8', name: 'Kharkiv_Polytechnic_Transcript_Record.pdf', type: 'PDF', size: '1.9 MB', status: 'verified', uploadedAt: '2026-10-02' }
-    ],
-    timeline: [
-      { date: '2026-10-02', title: 'Application Lodged', description: 'Submitted under Eastern European Conflict Emergency Education Window.', officer: 'System' },
-      { date: '2026-10-08', title: 'Document Verification Verified', description: 'IDP registry status and transcript equivalence confirmed.', officer: 'Anna Kowalska' },
-      { date: '2026-10-18', title: 'Committee Review Underway', description: 'Currently tabled before the Geneva Education Grants Panel.', officer: 'Executive Panel' }
-    ],
-    committeeNotes: 'High academic standing. Case under final funding allocation deliberation.',
-    createdAt: '2026-10-02T13:10:00Z',
-    updatedAt: '2026-10-18T10:00:00Z'
-  },
-  {
-    id: 'WHFS-2026-AF-19402',
-    userId: 'user-app-04',
-    fullName: 'Fatima Abba Kyari',
-    email: 'fatima.abba.kyari@yahoo.com',
-    phone: '+234 803 456 7890',
-    dateOfBirth: '2003-09-15',
-    gender: 'Female',
-    country: 'Nigeria',
-    region: 'Borno State',
-    address: 'Maiduguri Municipal Council',
-    programmeCategory: 'education',
-    programmeName: 'STEM & Digital Future for Girls Initiative',
-    institutionOrCommunity: 'Borno State University (B.Sc. Software Engineering)',
-    financialNeedLevel: 'High Need',
-    householdIncomeBracket: 'Under $1,000 USD annually',
-    dependentsCount: 6,
-    displacementStatus: 'Crisis Affected',
-    statementOfNeed: 'Surviving regional insurgency and displacement, I have worked as a volunteer coding tutor teaching younger girls basic web design at a local youth community center. This grant will cover my university software development tuition, internet connectivity data bundle, and an engineering laptop.',
-    amountRequestedUSD: 2200,
-    status: 'Under Review',
-    documents: [
-      { id: 'doc-9', name: 'National_Identity_Card_NIN.pdf', type: 'PDF', size: '950 KB', status: 'verified', uploadedAt: '2026-10-12' },
-      { id: 'doc-10', name: 'University_Acceptance_Borno.pdf', type: 'PDF', size: '1.4 MB', status: 'pending', uploadedAt: '2026-10-12' }
-    ],
-    timeline: [
-      { date: '2026-10-12', title: 'Application Lodged', description: 'Application registered in Sub-Saharan Africa STEM cohort.', officer: 'System' },
-      { date: '2026-10-15', title: 'Primary Intake Assessment', description: 'Application passed preliminary eligibility screening.', officer: 'Babajide Adeleke' }
-    ],
-    committeeNotes: 'Awaiting secondary verification of university semester invoice.',
-    createdAt: '2026-10-12T08:45:00Z',
-    updatedAt: '2026-10-15T11:20:00Z'
-  },
-  {
-    id: 'WHFS-2026-ME-63914',
-    userId: 'user-app-05',
-    fullName: 'Yousef Nabil Al-Khatib',
-    email: 'yousef.alkhatib@amman.jo',
-    phone: '+962 79 555 8921',
-    dateOfBirth: '1995-04-18',
-    gender: 'Male',
-    country: 'Jordan',
-    region: 'Mafraq Governorate',
-    address: 'Zaatari Camp Perimeter, Sector 4',
-    programmeCategory: 'humanitarian',
-    programmeName: 'Clean Water Boreholes & Community WASH Infrastructure',
-    institutionOrCommunity: 'Zaatari Host Community Agriculture & Water Cooperative',
-    financialNeedLevel: 'Critical/Emergency',
-    householdIncomeBracket: 'Under $1,800 USD annually',
-    dependentsCount: 7,
-    displacementStatus: 'Refugee',
-    statementOfNeed: 'Community water well pumps broke down 6 months ago, forcing 320 refugee and host families to buy expensive trucked water that consumes 40% of daily income. We urgently require replacement solar inverter pumps, filtration manifolds, and pipes to restore fresh potable water to the community tap stand.',
-    amountRequestedUSD: 5200,
-    status: 'Needs Clarification',
-    documents: [
-      { id: 'doc-11', name: 'Zaatari_Water_Technical_Assessment.pdf', type: 'PDF', size: '2.8 MB', status: 'verified', uploadedAt: '2026-10-05' }
-    ],
-    timeline: [
-      { date: '2026-10-05', title: 'Proposal Submitted', description: 'Community WASH infrastructure repair request received.', officer: 'System' },
-      { date: '2026-10-10', title: 'Engineering Review', description: 'Technical specifications evaluated. Requested pump head compatibility needs hydro-geological verification.', officer: 'Eng. Fadi Haddad' },
-      { date: '2026-10-16', title: 'Clarification Requested', description: 'Applicant contacted to supply borehole depth hydro-test report from Ministry of Water.', officer: 'Eng. Fadi Haddad' }
-    ],
-    committeeNotes: 'Awaiting revised hydrogeology report from local water authority.',
-    createdAt: '2026-10-05T14:15:00Z',
-    updatedAt: '2026-10-16T09:30:00Z'
-  }
-];
+export const INITIAL_APPLICATIONS: HumanitarianApplication[] = [];
 
-export const INITIAL_DONATIONS: DonationRecord[] = [
-  {
-    id: 'WHFS-DON-9281',
-    donorName: 'Dr. Arthur & Eleanor Vance',
-    donorEmail: 'a.vance@geneva-health.ch',
-    amount: 1500,
-    currency: 'USD',
-    frequency: 'one-time',
-    cause: 'Education & Scholarships',
-    date: '2026-10-28',
-    receiptNumber: 'REC-2026-9281',
-    isAnonymous: false,
-    paymentMethod: 'Credit / Visa'
-  },
-  {
-    id: 'WHFS-DON-9280',
-    donorName: 'Anonymous Donor',
-    donorEmail: 'supporter@whfs-aid.org',
-    amount: 500,
-    currency: 'USD',
-    frequency: 'monthly',
-    cause: 'Emergency Food Relief',
-    date: '2026-10-27',
-    receiptNumber: 'REC-2026-9280',
-    isAnonymous: true,
-    paymentMethod: 'Bank Wire / SEPA'
-  },
-  {
-    id: 'WHFS-DON-9279',
-    donorName: 'Kipchoge Foundation Trust',
-    donorEmail: 'trustees@kipchoge-charity.ke',
-    amount: 5000,
-    currency: 'USD',
-    frequency: 'one-time',
-    cause: 'Clean Water Access',
-    date: '2026-10-25',
-    receiptNumber: 'REC-2026-9279',
-    isAnonymous: false,
-    paymentMethod: 'Direct Wire'
-  },
-  {
-    id: 'WHFS-DON-9278',
-    donorName: 'Claire Beaumont',
-    donorEmail: 'cbeaumont@lyon-avocats.fr',
-    amount: 250,
-    currency: 'EUR',
-    frequency: 'monthly',
-    cause: 'Where Most Needed',
-    date: '2026-10-24',
-    receiptNumber: 'REC-2026-9278',
-    isAnonymous: false,
-    paymentMethod: 'Mastercard'
-  },
-  {
-    id: 'WHFS-DON-9277',
-    donorName: 'Marcus Aurelius Tan',
-    donorEmail: 'marcus.tan@singapore-invest.sg',
-    amount: 2000,
-    currency: 'USD',
-    frequency: 'one-time',
-    cause: 'Education & Scholarships',
-    date: '2026-10-22',
-    receiptNumber: 'REC-2026-9277',
-    isAnonymous: false,
-    paymentMethod: 'Amex'
-  }
-];
+export const INITIAL_DONATIONS: DonationRecord[] = [];
 
 export const IMPACT_STATISTICS = {
-  livesImpacted: '485,000+',
+  livesImpacted: '0',
   countriesActive: '52',
-  grantsDisbursedUSD: '$18,450,000',
-  scholarshipsGraduated: '14,200+',
-  waterBoreholesOperational: '240+',
-  directAidRatio: '94.2%',
-  auditRating: 'AAA Transparency Rating'
+  grantsDisbursedUSD: '$0',
+  scholarshipsGraduated: '0',
+  waterBoreholesOperational: '0',
+  directAidRatio: '100%',
+  auditRating: 'Official Humanitarian Registry'
 };
 
 export const GLOBAL_OFFICES = [
@@ -526,3 +290,35 @@ export const FAQS = [
     answer: 'Emergency food, water, and shelter interventions undergo expedited triage within 24 to 48 hours of field verification. Academic scholarships are reviewed on quarterly cohort schedules, with decisions communicated within 30 days of submission.'
   }
 ];
+
+export const DEFAULT_PAYOUT_SETTINGS: PayoutAccountSettings = {
+  // Mobile Money
+  airtelMoneyNumber: '+260 97 458 9210',
+  airtelAccountName: 'WHFS Zambia Relief Operations (Airtel Merchant)',
+  mtnMoneyNumber: '+260 96 312 8904',
+  mtnAccountName: 'WHFS Regional Grants Desk (MTN MoMo)',
+  airtelKenyaNumber: '0762641585',
+  airtelKenyaAccountName: 'Samuel Soi (Airtel Kenya Treasury)',
+  mpesaNumber: '+254 712 345 678',
+  mpesaPaybill: '849201',
+  
+  // Bank Account
+  bankName: 'Zambia National Commercial Bank (Zanaco)',
+  bankAccountName: 'Worldwide Humanitarian Foundation Support Trust',
+  bankAccountNumber: '048201948201',
+  bankBranch: 'Lusaka Corporate Branch, Cairo Road',
+  bankSwiftCode: 'ZNCOZMLU',
+
+  // PayPal
+  paypalEmail: 'treasury@whfs.org',
+
+  // Stripe / Card
+  stripeActive: true,
+  
+  updatedAt: '2026-11-01T10:00:00Z'
+};
+
+export const INITIAL_PAYMENTS: RegistrationFeePayment[] = [];
+
+export const INITIAL_WITHDRAWALS: WithdrawalRecord[] = [];
+

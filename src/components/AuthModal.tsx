@@ -8,7 +8,7 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const { login, adminLogin, register, switchRoleDemo, setActiveTab } = useApp();
+  const { login, adminLogin, register, setActiveTab } = useApp();
   const [mode, setMode] = useState<'signin' | 'register'>('signin');
   const [role, setRole] = useState<'applicant' | 'admin'>('applicant');
   
@@ -45,14 +45,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleQuickDemo = (targetRole: 'applicant' | 'admin') => {
-    switchRoleDemo(targetRole);
-    if (targetRole === 'admin') {
-      setActiveTab('admin');
-    }
-    onClose();
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
       <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
@@ -76,31 +68,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           <p className="text-xs text-slate-300 mt-1">
             Access your applications, track relief grants, or manage foundation funds.
           </p>
-        </div>
-
-        {/* Demo Fast Logins for Testing */}
-        <div className="p-4 bg-amber-50/70 border-b border-amber-200/60">
-          <p className="text-[11px] font-bold text-amber-950 uppercase tracking-wider mb-2">
-            Instant One-Click Demo Access
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('applicant')}
-              className="px-2.5 py-2 text-xs font-semibold bg-white border border-amber-300 rounded-lg text-slate-800 hover:bg-amber-100/50 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-            >
-              <User className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Demo Applicant</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('admin')}
-              className="px-2.5 py-2 text-xs font-semibold bg-white border border-amber-300 rounded-lg text-slate-800 hover:bg-amber-100/50 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-              <span>Demo Officer (Admin)</span>
-            </button>
-          </div>
         </div>
 
         {/* Form Body */}

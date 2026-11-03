@@ -114,7 +114,7 @@ export const TrackingPage: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Enter Reference ID (e.g. WHFS-2026-AF-94821) or Applicant Name"
+                placeholder="Enter Application Reference ID or Applicant Name"
                 className="w-full pl-11 pr-4 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl focus:outline-hidden focus:border-[#0a1f38] uppercase"
               />
             </div>
@@ -125,28 +125,6 @@ export const TrackingPage: React.FC = () => {
               Search Registry
             </button>
           </form>
-
-          {/* Quick Demo Pickers */}
-          <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-            <span className="font-semibold text-slate-700">Quick track demo cases:</span>
-            {applications.slice(0, 4).map(app => (
-              <button
-                key={app.id}
-                onClick={() => {
-                  setSearchQuery(app.id);
-                  setSelectedTrackingId(app.id);
-                  setActiveApp(app);
-                }}
-                className={`px-2 py-1 rounded text-[11px] font-mono transition-colors cursor-pointer ${
-                  activeApp?.id === app.id
-                    ? 'bg-[#0a1f38] text-white'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                {app.id} ({app.status})
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Detailed Application View */}

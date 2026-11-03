@@ -117,7 +117,7 @@ export const ContactPage: React.FC = () => {
                     required
                     value={contactName}
                     onChange={(e) => setContactName(e.target.value)}
-                    placeholder="e.g. John Doe"
+                    placeholder="Your full legal name"
                     className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
                   />
                 </div>

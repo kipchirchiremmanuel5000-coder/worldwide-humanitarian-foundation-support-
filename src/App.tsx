@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
@@ -17,33 +17,57 @@ import { HomePage } from './pages/HomePage';
 import { AboutUsPage } from './pages/AboutUsPage';
 import { EducationPage } from './pages/EducationPage';
 import { HumanitarianPage } from './pages/HumanitarianPage';
+import { Application } from './pages/Application';
 import { ApplicationFormPage } from './pages/ApplicationFormPage';
 import { TrackingPage } from './pages/TrackingPage';
 import { DonationPage } from './pages/DonationPage';
 import { ContactPage } from './pages/ContactPage';
 import { Admin } from './pages/Admin';
 
+// Protected Route Guard for /admin: Only allows admin@whfs.org, authorized admin email, or role === 'admin'
+const ProtectedAdminRoute: React.FC<{ onOpenFirebaseModal: () => void }> = ({ onOpenFirebaseModal }) => {
+  const { currentUser } = useApp();
+  const isAdmin = currentUser?.email === 'admin@whfs.org' || currentUser?.email === 'kipchirchiremmanuel5000@gmail.com' || currentUser?.role === 'admin';
+
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <Admin onOpenFirebaseModal={onOpenFirebaseModal} />;
+};
+
 const AppRoutes: React.FC<{ onOpenFirebaseModal: () => void }> = ({ onOpenFirebaseModal }) => {
-  const { activeTab, setActiveTab } = useApp();
+  const { activeTab, setActiveTab, currentUser } = useApp();
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Sync browser URL to AppContext activeTab
+  const isAdmin = currentUser?.email === 'admin@whfs.org' || currentUser?.email === 'kipchirchiremmanuel5000@gmail.com' || currentUser?.role === 'admin';
+
+  // Sync browser URL to AppContext activeTab and intercept unauthorized /admin navigation
   useEffect(() => {
     const rawPath = location.pathname.replace(/^\//, '').split('/')[0];
     const currentRoute = rawPath || 'home';
+    if (currentRoute === 'admin' && !isAdmin) {
+      navigate('/', { replace: true });
+      setActiveTab('home');
+      return;
+    }
     if (currentRoute !== activeTab) {
       setActiveTab(currentRoute);
     }
-  }, [location.pathname]);
+  }, [location.pathname, isAdmin]);
 
   // Sync AppContext activeTab changes to browser URL
   useEffect(() => {
+    if (activeTab === 'admin' && !isAdmin) {
+      setActiveTab('home');
+      return;
+    }
     const targetUrl = activeTab === 'home' ? '/' : `/${activeTab}`;
     if (location.pathname !== targetUrl) {
       navigate(targetUrl);
     }
-  }, [activeTab]);
+  }, [activeTab, isAdmin]);
 
   return (
     <Routes>
@@ -52,11 +76,12 @@ const AppRoutes: React.FC<{ onOpenFirebaseModal: () => void }> = ({ onOpenFireba
       <Route path="/about" element={<AboutUsPage />} />
       <Route path="/education" element={<EducationPage />} />
       <Route path="/humanitarian" element={<HumanitarianPage />} />
-      <Route path="/apply" element={<ApplicationFormPage />} />
+      <Route path="/apply" element={<Application />} />
+      <Route path="/application" element={<Application />} />
       <Route path="/track" element={<TrackingPage />} />
       <Route path="/donate" element={<DonationPage />} />
       <Route path="/contact" element={<ContactPage />} />
-      <Route path="/admin" element={<Admin onOpenFirebaseModal={onOpenFirebaseModal} />} />
+      <Route path="/admin" element={<ProtectedAdminRoute onOpenFirebaseModal={onOpenFirebaseModal} />} />
       <Route path="*" element={<HomePage />} />
     </Routes>
   );

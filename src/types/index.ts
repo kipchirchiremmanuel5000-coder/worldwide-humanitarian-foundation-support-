@@ -46,6 +46,20 @@ export interface HumanitarianApplication {
   statementOfNeed: string;
   amountRequestedUSD: number;
   amountAwardedUSD?: number;
+  amountRequestedLocal?: number;
+  localCurrencyCode?: string;
+  localCurrencySymbol?: string;
+  localCurrencyRate?: number;
+  localCurrencyDisplay?: string;
+  countryFlag?: string;
+  registrationFeeUSD?: number;
+  registrationFeeLocal?: string;
+  // Payment tracking attributes
+  hasPaidRegistrationFee?: boolean;
+  paymentMethod?: string;
+  paymentTransactionId?: string;
+  paymentStatus?: 'Paid' | 'Pending Verification' | 'Unpaid';
+  paymentDate?: string;
   status: ApplicationStatus;
   documents: DocumentAttachment[];
   timeline: ApplicationTimelineEvent[];
@@ -53,6 +67,65 @@ export interface HumanitarianApplication {
   createdAt: string;
   updatedAt: string;
   disbursementDate?: string;
+}
+
+export interface RegistrationFeePayment {
+  id: string; // e.g. WHFS-PAY-2026-901
+  applicationId: string;
+  applicantName: string;
+  applicantEmail: string;
+  country: string;
+  countryFlag: string;
+  amountUSD: number;
+  amountLocal: number;
+  currencyCode: string;
+  currencySymbol: string;
+  paymentMethod: string; // Airtel Money, MTN Money, Bank, M-Pesa, PayPal, etc.
+  transactionReference: string;
+  date: string;
+  status: 'Paid' | 'Pending Verification' | 'Refunded' | 'Unpaid';
+  notes?: string;
+}
+
+export interface PayoutAccountSettings {
+  // Mobile Money
+  airtelMoneyNumber: string;
+  airtelAccountName: string;
+  mtnMoneyNumber: string;
+  mtnAccountName: string;
+  airtelKenyaNumber?: string;
+  airtelKenyaAccountName?: string;
+  mpesaNumber: string;
+  mpesaPaybill: string;
+  
+  // Bank Account
+  bankName: string;
+  bankAccountName: string;
+  bankAccountNumber: string;
+  bankBranch: string;
+  bankSwiftCode: string;
+
+  // PayPal
+  paypalEmail: string;
+
+  // Stripe / Card
+  stripeActive: boolean;
+  
+  updatedAt: string;
+}
+
+export interface WithdrawalRecord {
+  id: string; // e.g. WTH-2026-8910
+  amountUSD: number;
+  amountZMW: number;
+  method: 'Airtel Money' | 'MTN Mobile Money' | 'Bank Transfer' | 'PayPal' | 'M-Pesa';
+  destinationAccount: string;
+  recipientName: string;
+  requestedBy: string;
+  date: string;
+  status: 'Completed' | 'Pending' | 'Processing';
+  referenceCode: string;
+  notes?: string;
 }
 
 export interface UserProfile {
