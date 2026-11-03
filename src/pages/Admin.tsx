@@ -109,25 +109,16 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
   const [isWithdrawalModalOpen, setIsWithdrawalModalOpen] = useState(false);
   const [withdrawAmountUSD, setWithdrawAmountUSD] = useState<number>(250);
   const [withdrawMethod, setWithdrawMethod] = useState<WithdrawalRecord['method']>('Airtel Money');
-  const [withdrawRecipient, setWithdrawRecipient] = useState<string>('Kondwani Mulenga (Disbursement Liaison)');
-  const [withdrawAccount, setWithdrawAccount] = useState<string>(payoutSettings?.airtelMoneyNumber || '+260 97 458 9210');
-  const [withdrawNotes, setWithdrawNotes] = useState<string>('Disbursal for Lusaka students equipment and transit allowances');
+  const [withdrawRecipient, setWithdrawRecipient] = useState<string>('Samuel Soi (Airtel Kenya Treasury)');
+  const [withdrawAccount, setWithdrawAccount] = useState<string>(payoutSettings?.airtelKenyaNumber || '0762641585');
+  const [withdrawNotes, setWithdrawNotes] = useState<string>('Treasury fund withdrawal to Airtel Kenya');
   const [isExecutingWithdrawal, setIsExecutingWithdrawal] = useState(false);
 
   // Update destination account field dynamically when method changes
   const handleWithdrawMethodChange = (newMethod: WithdrawalRecord['method']) => {
     setWithdrawMethod(newMethod);
-    if (newMethod === 'Airtel Money') {
-      setWithdrawAccount(payoutSettings.airtelMoneyNumber || '+260 97 458 9210');
-    } else if (newMethod === 'MTN Mobile Money') {
-      setWithdrawAccount(payoutSettings.mtnMoneyNumber || '+260 96 312 8904');
-    } else if (newMethod === 'Bank Transfer') {
-      setWithdrawAccount(`${payoutSettings.bankName} - Acc #${payoutSettings.bankAccountNumber}`);
-    } else if (newMethod === 'PayPal') {
-      setWithdrawAccount(payoutSettings.paypalEmail || 'treasury@whfs.org');
-    } else if (newMethod === 'M-Pesa') {
-      setWithdrawAccount(payoutSettings.mpesaNumber || '+254 712 345 678');
-    }
+    setWithdrawAccount(payoutSettings?.airtelKenyaNumber || '0762641585');
+    setWithdrawRecipient(payoutSettings?.airtelKenyaAccountName || 'Samuel Soi');
   };
 
   const handleExecuteWithdrawal = async (e: React.FormEvent) => {
@@ -911,33 +902,39 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                   </span>
                 </div>
                 <div className="text-[10px] text-slate-400 pt-3 border-t border-slate-100">
-                  Via Airtel Money, MTN MoMo & Bank Wire
+                  Via Airtel Kenya 0762641585 (Samuel Soi)
                 </div>
               </div>
 
-              {/* Card 4: Configured Payout Channels */}
+              {/* Card 4: Configured Payout Channels - Single Source of Truth */}
               <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                       Active Receiving Channels
                     </span>
-                    <div className="p-2 bg-blue-500/10 rounded-lg text-blue-600">
-                      <Landmark className="w-4 h-4" />
+                    <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-600">
+                      <Smartphone className="w-4 h-4" />
                     </div>
                   </div>
-                  <div className="mt-2 space-y-1 text-xs">
-                    <div className="flex items-center justify-between font-mono text-[11px]">
-                      <span className="text-slate-600">Airtel Money 🇿🇲:</span>
-                      <span className="font-bold text-slate-900 truncate max-w-[120px]">{payoutSettings.airtelMoneyNumber}</span>
-                    </div>
-                    <div className="flex items-center justify-between font-mono text-[11px]">
-                      <span className="text-slate-600">MTN MoMo 🇿🇲:</span>
-                      <span className="font-bold text-slate-900 truncate max-w-[120px]">{payoutSettings.mtnMoneyNumber}</span>
-                    </div>
-                    <div className="flex items-center justify-between font-mono text-[11px]">
-                      <span className="text-slate-600">Zanaco Bank:</span>
-                      <span className="font-bold text-slate-900 truncate max-w-[120px]">{payoutSettings.bankAccountNumber}</span>
+                  <div className="mt-3 text-xs">
+                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200/80 font-mono text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-800 flex items-center gap-1.5 font-sans">
+                          <span>🇰🇪</span>
+                          <span>Airtel Kenya:</span>
+                        </span>
+                        <span className="font-black text-emerald-800 text-sm">
+                          {payoutSettings.airtelKenyaNumber || '0762641585'}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-600 font-sans flex items-center justify-between pt-0.5">
+                        <span>Recipient:</span>
+                        <span className="font-bold text-slate-900">{payoutSettings.airtelKenyaAccountName || 'Samuel Soi'}</span>
+                      </div>
+                      <div className="text-[10px] text-emerald-700 font-sans pt-1 border-t border-emerald-200/60 font-semibold">
+                        Single Source of Truth Treasury Account
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1285,221 +1282,60 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                   updatePayoutSettings(payoutForm);
                 }} className="space-y-6">
                   
-                  {/* Section 1: Mobile Money Receivers */}
-                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
-                    <span className="text-xs uppercase tracking-wider text-[#0a1f38] font-bold flex items-center gap-2">
-                      <Smartphone className="w-4 h-4 text-emerald-600" />
-                      <span>1. Mobile Money Accounts (Zambia & Regional East Africa)</span>
-                    </span>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  {/* TREASURY PAYOUT ACCOUNT (Single Source of Truth) */}
+                  <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 space-y-5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                        🇰🇪
+                      </div>
                       <div>
-                        <label className="block font-semibold text-slate-700 mb-1">
-                          Airtel Money Number (Zambia 🇿🇲) *
+                        <span className="text-xs uppercase tracking-wider text-[#0a1f38] font-black block">
+                          TREASURY PAYOUT ACCOUNT (Single Source of Truth)
+                        </span>
+                        <span className="text-[11px] text-slate-500 block">
+                          Primary receiving destination for applicant intake fees and institutional treasury reserves.
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
+                      {/* Field 1: Airtel Kenya Number (Admin Samuel Soi 🇰🇪) */}
+                      <div>
+                        <label className="block font-bold text-slate-800 mb-1.5">
+                          Airtel Kenya Number (Admin Samuel Soi 🇰🇪) *
+                        </label>
+                        <div className="relative">
+                          <Smartphone className="w-4 h-4 text-emerald-600 absolute left-3.5 top-3" />
+                          <input
+                            type="text"
+                            required
+                            value={payoutForm.airtelKenyaNumber || '0762641585'}
+                            onChange={(e) => setPayoutForm(prev => ({ ...prev, airtelKenyaNumber: e.target.value }))}
+                            placeholder="0762641585"
+                            className="w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-xl focus:outline-hidden focus:border-[#0a1f38] font-mono font-black text-sm text-slate-900 bg-white shadow-2xs"
+                          />
+                        </div>
+                        <span className="text-[10px] text-slate-500 block mt-1">
+                          Default treasury line: 0762641585. Editable.
+                        </span>
+                      </div>
+
+                      {/* Field 2: Airtel Kenya Account Name */}
+                      <div>
+                        <label className="block font-bold text-slate-800 mb-1.5">
+                          Airtel Kenya Account Name *
                         </label>
                         <input
                           type="text"
                           required
-                          value={payoutForm.airtelMoneyNumber}
-                          onChange={(e) => setPayoutForm(prev => ({ ...prev, airtelMoneyNumber: e.target.value }))}
-                          placeholder="+260 97 458 9210"
-                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38] font-mono"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block font-semibold text-slate-700 mb-1">
-                          Airtel Account / Merchant Name
-                        </label>
-                        <input
-                          type="text"
-                          value={payoutForm.airtelAccountName}
-                          onChange={(e) => setPayoutForm(prev => ({ ...prev, airtelAccountName: e.target.value }))}
-                          placeholder="WHFS Zambia Relief Operations"
-                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block font-semibold text-slate-700 mb-1">
-                          MTN Money Number (for Zambia 🇿🇲) *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={payoutForm.mtnMoneyNumber}
-                          onChange={(e) => setPayoutForm(prev => ({ ...prev, mtnMoneyNumber: e.target.value }))}
-                          placeholder="+260 96 312 8904"
-                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38] font-mono"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block font-semibold text-slate-700 mb-1">
-                          MTN Account / MoMo Name
-                        </label>
-                        <input
-                          type="text"
-                          value={payoutForm.mtnAccountName}
-                          onChange={(e) => setPayoutForm(prev => ({ ...prev, mtnAccountName: e.target.value }))}
-                          placeholder="WHFS Regional Grants Desk"
-                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block font-semibold text-slate-700 mb-1">
-                          M-Pesa Number (Kenya 🇰🇪)
-                        </label>
-                        <input
-                          type="text"
-                          value={payoutForm.mpesaNumber}
-                          onChange={(e) => setPayoutForm(prev => ({ ...prev, mpesaNumber: e.target.value }))}
-                          placeholder="+254 712 345 678"
-                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38] font-mono"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block font-semibold text-slate-700 mb-1">
-                          Airtel Kenya Number (Admin Samuel Soi 🇰🇪)
-                        </label>
-                        <input
-                          type="text"
-                          value={payoutForm.airtelKenyaNumber || '0762641585'}
-                          onChange={(e) => setPayoutForm(prev => ({ ...prev, airtelKenyaNumber: e.target.value }))}
-                          placeholder="0762641585"
-                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38] font-mono font-bold"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block font-semibold text-slate-700 mb-1">
-                          Airtel Kenya Account Name
-                        </label>
-                        <input
-                          type="text"
-                          value={payoutForm.airtelKenyaAccountName || 'Samuel Soi'}
+                          value={payoutForm.airtelKenyaAccountName || 'Samuel Soi (Airtel Kenya Treasury)'}
                           onChange={(e) => setPayoutForm(prev => ({ ...prev, airtelKenyaAccountName: e.target.value }))}
-                          placeholder="Samuel Soi"
-                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
+                          placeholder="Samuel Soi (Airtel Kenya Treasury)"
+                          className="w-full p-2.5 border border-slate-300 rounded-xl focus:outline-hidden focus:border-[#0a1f38] text-slate-900 bg-white font-bold text-xs shadow-2xs"
                         />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Section 2: Bank Account Details */}
-                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
-                    <span className="text-xs uppercase tracking-wider text-[#0a1f38] font-bold flex items-center gap-2">
-                      <Landmark className="w-4 h-4 text-blue-600" />
-                      <span>2. Institutional Bank Account (Zambia & International Wires)</span>
-                    </span>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                      <div>
-                        <label className="block font-semibold text-slate-700 mb-1">
-                          Bank Name *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={payoutForm.bankName}
-                          onChange={(e) => setPayoutForm(prev => ({ ...prev, bankName: e.target.value }))}
-                          placeholder="Zambia National Commercial Bank (Zanaco)"
-                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block font-semibold text-slate-700 mb-1">
-                          Account Name *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={payoutForm.bankAccountName}
-                          onChange={(e) => setPayoutForm(prev => ({ ...prev, bankAccountName: e.target.value }))}
-                          placeholder="Worldwide Humanitarian Foundation Support Trust"
-                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block font-semibold text-slate-700 mb-1">
-                          Account Number *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={payoutForm.bankAccountNumber}
-                          onChange={(e) => setPayoutForm(prev => ({ ...prev, bankAccountNumber: e.target.value }))}
-                          placeholder="048201948201"
-                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38] font-mono"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block font-semibold text-slate-700 mb-1">
-                          Branch Name / Location
-                        </label>
-                        <input
-                          type="text"
-                          value={payoutForm.bankBranch}
-                          onChange={(e) => setPayoutForm(prev => ({ ...prev, bankBranch: e.target.value }))}
-                          placeholder="Lusaka Corporate Branch, Cairo Road"
-                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
-                        />
-                      </div>
-
-                      <div className="sm:col-span-2">
-                        <label className="block font-semibold text-slate-700 mb-1">
-                          SWIFT / BIC Code *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={payoutForm.bankSwiftCode}
-                          onChange={(e) => setPayoutForm(prev => ({ ...prev, bankSwiftCode: e.target.value }))}
-                          placeholder="ZNCOZMLU"
-                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38] font-mono font-bold"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Section 3: PayPal & Stripe */}
-                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
-                    <span className="text-xs uppercase tracking-wider text-[#0a1f38] font-bold flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-purple-600" />
-                      <span>3. PayPal & Card Payment Gateways</span>
-                    </span>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                      <div>
-                        <label className="block font-semibold text-slate-700 mb-1">
-                          PayPal Receiving Email *
-                        </label>
-                        <input
-                          type="email"
-                          required
-                          value={payoutForm.paypalEmail}
-                          onChange={(e) => setPayoutForm(prev => ({ ...prev, paypalEmail: e.target.value }))}
-                          placeholder="treasury@whfs.org"
-                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
-                        />
-                      </div>
-
-                      <div className="flex items-center gap-3 pt-6">
-                        <input
-                          type="checkbox"
-                          id="stripeActive"
-                          checked={payoutForm.stripeActive}
-                          onChange={(e) => setPayoutForm(prev => ({ ...prev, stripeActive: e.target.checked }))}
-                          className="rounded text-[#059669] focus:ring-[#059669] cursor-pointer"
-                        />
-                        <label htmlFor="stripeActive" className="text-xs font-semibold text-slate-700 cursor-pointer">
-                          Enable Stripe / Direct Card Gateway for Global Intake
-                        </label>
+                        <span className="text-[10px] text-slate-500 block mt-1">
+                          Default: Samuel Soi.
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1511,8 +1347,8 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                       disabled={isSavingPayoutSettings}
                       className="px-6 py-3 bg-[#0a1f38] hover:bg-[#133e87] text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-2"
                     >
-                      <CheckCircle2 className="w-4 h-4 text-amber-400" />
-                      <span>{isSavingPayoutSettings ? 'Saving Settings...' : 'Save Payment Methods & Receiving Accounts'}</span>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <span>{isSavingPayoutSettings ? 'Saving Settings...' : 'Save Treasury Settings'}</span>
                     </button>
                   </div>
 
@@ -1948,25 +1784,25 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                   required
                   value={withdrawAccount}
                   onChange={(e) => setWithdrawAccount(e.target.value)}
-                  placeholder="e.g. +260 97 458 9210 or Zanaco Acc 048201948201"
+                  placeholder="0762641585 (Samuel Soi - Airtel Kenya)"
                   className="w-full p-2.5 border border-slate-300 rounded-lg font-mono focus:outline-hidden focus:border-[#0a1f38]"
                 />
                 <p className="text-[10px] text-slate-400 mt-1">
-                  Auto-populated from configured Treasury payment methods. You may also edit for one-off field dispatches.
+                  Auto-populated from Treasury Payout Account (Airtel Kenya 0762641585).
                 </p>
               </div>
 
               {/* Recipient Name */}
               <div>
                 <label className="block font-bold text-slate-800 mb-1">
-                  Recipient Name / Authorized Field Liaison *
+                  Recipient Name / Treasury Officer *
                 </label>
                 <input
                   type="text"
                   required
                   value={withdrawRecipient}
                   onChange={(e) => setWithdrawRecipient(e.target.value)}
-                  placeholder="e.g. Kondwani Mulenga (Disbursement Liaison)"
+                  placeholder="Samuel Soi (Airtel Kenya Treasury)"
                   className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
                 />
               </div>
@@ -1980,7 +1816,7 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                   type="text"
                   value={withdrawNotes}
                   onChange={(e) => setWithdrawNotes(e.target.value)}
-                  placeholder="e.g. Field stipend for Copperbelt emergency aid team"
+                  placeholder="e.g. Treasury transfer to Airtel Kenya 0762641585"
                   className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
                 />
               </div>

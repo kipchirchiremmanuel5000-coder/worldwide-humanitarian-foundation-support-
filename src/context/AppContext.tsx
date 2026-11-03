@@ -122,6 +122,12 @@ if (typeof window !== 'undefined') {
       }
       localStorage.setItem(CLEAN_REGISTRY_FLAG, 'true');
     }
+
+    const CLEAN_PAYOUT_FLAG = 'whfs_clean_airtel_ke_v1';
+    if (!localStorage.getItem(CLEAN_PAYOUT_FLAG)) {
+      localStorage.removeItem(STORAGE_KEYS.PAYOUT_SETTINGS);
+      localStorage.setItem(CLEAN_PAYOUT_FLAG, 'true');
+    }
   } catch (e) {
     console.warn('Storage purge error:', e);
   }

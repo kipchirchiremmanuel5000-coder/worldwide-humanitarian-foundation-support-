@@ -744,21 +744,21 @@ export const Application: React.FC = () => {
                       <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-2">
                         <span className="font-bold text-[#0a1f38] block flex items-center gap-1.5">
                           <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Official Payment Options & Receiving Accounts:</span>
+                          <span>Official Treasury Receiving Account:</span>
                         </span>
                         
                         <div className="text-[11px] text-slate-700 space-y-1.5 leading-relaxed font-mono">
-                          <p className="bg-white p-2 rounded border border-slate-200">
-                            Pay via Airtel Money: <strong className="text-emerald-700">{payoutSettings?.airtelMoneyNumber || '+260 97 458 9210'}</strong>, MTN: <strong className="text-amber-700">{payoutSettings?.mtnMoneyNumber || '+260 96 312 8904'}</strong>, or Bank
+                          <p className="bg-white p-2.5 rounded-lg border border-emerald-200 flex flex-wrap items-center justify-between gap-2 shadow-xs">
+                            <span className="text-slate-800">
+                              Airtel Kenya: <strong className="text-emerald-700 text-xs font-bold">{payoutSettings?.airtelKenyaNumber || '0762641585'}</strong> · <span className="font-semibold text-slate-700">{payoutSettings?.airtelKenyaAccountName || 'Samuel Soi'}</span>
+                            </span>
+                            <span className="text-[10px] bg-emerald-50 text-emerald-800 font-sans font-bold px-2 py-0.5 rounded border border-emerald-300">
+                              🇰🇪 Primary Treasury Channel
+                            </span>
                           </p>
-                          <p className="text-slate-600 text-[10.5px]">
-                            • Bank Wire: <strong>{payoutSettings?.bankName || 'Zanaco Bank'}</strong> · Acc: <strong>{payoutSettings?.bankAccountNumber || '048201948201'}</strong> · SWIFT: <strong>{payoutSettings?.bankSwiftCode || 'ZNCOZMLU'}</strong>
+                          <p className="text-slate-600 text-[10.5px] font-sans">
+                            • Cross-border gateway automated via PawaPay: All applicant fees (ZMW, etc.) settle directly to Admin Airtel Kenya <strong className="font-mono text-slate-800">{payoutSettings?.airtelKenyaNumber || '0762641585'}</strong>.
                           </p>
-                          {payoutSettings?.paypalEmail && (
-                            <p className="text-slate-600 text-[10.5px]">
-                              • PayPal / Card: <strong>{payoutSettings.paypalEmail}</strong>
-                            </p>
-                          )}
                         </div>
                       </div>
 

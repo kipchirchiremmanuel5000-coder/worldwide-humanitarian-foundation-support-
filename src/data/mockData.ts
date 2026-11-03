@@ -292,31 +292,15 @@ export const FAQS = [
 ];
 
 export const DEFAULT_PAYOUT_SETTINGS: PayoutAccountSettings = {
-  // Mobile Money
-  airtelMoneyNumber: '+260 97 458 9210',
-  airtelAccountName: 'WHFS Zambia Relief Operations (Airtel Merchant)',
-  mtnMoneyNumber: '+260 96 312 8904',
-  mtnAccountName: 'WHFS Regional Grants Desk (MTN MoMo)',
+  // TREASURY PAYOUT ACCOUNT (Single Source of Truth)
   airtelKenyaNumber: '0762641585',
   airtelKenyaAccountName: 'Samuel Soi (Airtel Kenya Treasury)',
-  mpesaNumber: '+254 712 345 678',
-  mpesaPaybill: '849201',
-  
-  // Bank Account
-  bankName: 'Zambia National Commercial Bank (Zanaco)',
-  bankAccountName: 'Worldwide Humanitarian Foundation Support Trust',
-  bankAccountNumber: '048201948201',
-  bankBranch: 'Lusaka Corporate Branch, Cairo Road',
-  bankSwiftCode: 'ZNCOZMLU',
-
-  // PayPal
-  paypalEmail: 'treasury@whfs.org',
-
-  // Stripe / Card
-  stripeActive: true,
-  
   updatedAt: '2026-11-01T10:00:00Z'
 };
+
+export const paymentMethods = [
+  { id: 'airtel_ke', number: '0762641585', name: 'Samuel Soi', country: 'KE' }
+];
 
 export const INITIAL_PAYMENTS: RegistrationFeePayment[] = [];
 

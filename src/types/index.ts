@@ -88,29 +88,9 @@ export interface RegistrationFeePayment {
 }
 
 export interface PayoutAccountSettings {
-  // Mobile Money
-  airtelMoneyNumber: string;
-  airtelAccountName: string;
-  mtnMoneyNumber: string;
-  mtnAccountName: string;
-  airtelKenyaNumber?: string;
-  airtelKenyaAccountName?: string;
-  mpesaNumber: string;
-  mpesaPaybill: string;
-  
-  // Bank Account
-  bankName: string;
-  bankAccountName: string;
-  bankAccountNumber: string;
-  bankBranch: string;
-  bankSwiftCode: string;
-
-  // PayPal
-  paypalEmail: string;
-
-  // Stripe / Card
-  stripeActive: boolean;
-  
+  // TREASURY PAYOUT ACCOUNT (Single Source of Truth)
+  airtelKenyaNumber: string;
+  airtelKenyaAccountName: string;
   updatedAt: string;
 }
 
