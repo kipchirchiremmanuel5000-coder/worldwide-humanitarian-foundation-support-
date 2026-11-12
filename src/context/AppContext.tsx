@@ -1,25 +1,51 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  UserProfile, 
-  HumanitarianApplication, 
-  DonationRecord, 
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+  updateProfile
+} from 'firebase/auth';
+import {
+  collection,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  onSnapshot
+} from 'firebase/firestore';
+import {
+  auth,
+  db,
+  googleProvider,
+  FIRESTORE_COLLECTIONS,
+  OperationType,
+  handleFirestoreError,
+  isAdminEmail,
+  PRIMARY_ADMIN_EMAIL
+} from '../firebase/config';
+import {
+  UserProfile,
+  HumanitarianApplication,
+  DonationRecord,
   ApplicationStatus,
   ProgrammeCategory,
   RegistrationFeePayment,
   PayoutAccountSettings,
   WithdrawalRecord
 } from '../types';
-import { 
-  INITIAL_APPLICATIONS, 
+import {
+  INITIAL_APPLICATIONS,
   INITIAL_DONATIONS,
   DEFAULT_PAYOUT_SETTINGS,
   INITIAL_PAYMENTS,
   INITIAL_WITHDRAWALS
 } from '../data/mockData';
-import { 
-  getCurrency, 
-  formatFundingDisplay, 
-  DEFAULT_REGISTRATION_FEE_USD 
+import {
+  getCurrency,
+  formatFundingDisplay,
+  DEFAULT_REGISTRATION_FEE_USD
 } from '../data/allCurrencies';
 
 interface ToastState {
@@ -41,6 +67,8 @@ export interface FinancialMetrics {
 
 interface AppContextType {
   currentUser: UserProfile | null;
+  authReady: boolean;
+  firebaseAuthError: string | null;
   applications: HumanitarianApplication[];
   donations: DonationRecord[];
   payments: RegistrationFeePayment[];
@@ -56,24 +84,25 @@ interface AppContextType {
   toasts: ToastState[];
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   removeToast: (id: string) => void;
-  login: (email: string, role?: 'applicant' | 'admin') => Promise<boolean>;
+  login: (email: string, password?: string) => Promise<boolean>;
   adminLogin: (email: string, password: string) => Promise<boolean>;
-  register: (name: string, email: string, country: string, role?: 'applicant' | 'admin') => Promise<boolean>;
-  logout: () => void;
-  switchRoleDemo: (role: 'applicant' | 'admin') => void;
+  adminGoogleLogin: () => Promise<boolean>;
+  register: (name: string, email: string, country: string, password?: string) => Promise<boolean>;
+  logout: () => Promise<void>;
   submitApplication: (data: Partial<HumanitarianApplication>) => Promise<HumanitarianApplication>;
+  lookupApplicationById: (trackingId: string) => Promise<HumanitarianApplication | null>;
   updateApplicationStatus: (
-    id: string, 
-    status: ApplicationStatus, 
-    officerNotes?: string, 
+    id: string,
+    status: ApplicationStatus,
+    officerNotes?: string,
     amountAwardedUSD?: number
-  ) => void;
-  approveApplication: (id: string, amount?: number) => void;
-  rejectApplication: (id: string, reason?: string) => void;
+  ) => Promise<void>;
+  approveApplication: (id: string, amount?: number) => Promise<void>;
+  rejectApplication: (id: string, reason?: string) => Promise<void>;
   recordDonation: (data: Omit<DonationRecord, 'id' | 'date' | 'receiptNumber'>) => Promise<DonationRecord>;
   recordRegistrationPayment: (payment: Partial<RegistrationFeePayment>) => Promise<RegistrationFeePayment>;
-  updatePaymentStatus: (paymentId: string, status: RegistrationFeePayment['status']) => void;
-  updatePayoutSettings: (newSettings: Partial<PayoutAccountSettings>) => void;
+  updatePaymentStatus: (paymentId: string, status: RegistrationFeePayment['status']) => Promise<void>;
+  updatePayoutSettings: (newSettings: Partial<PayoutAccountSettings>) => Promise<void>;
   requestWithdrawal: (data: {
     amountUSD: number;
     method: WithdrawalRecord['method'];
@@ -81,7 +110,7 @@ interface AppContextType {
     recipientName: string;
     notes?: string;
   }) => Promise<WithdrawalRecord>;
-  updateWithdrawalStatus: (withdrawalId: string, status: WithdrawalRecord['status']) => void;
+  updateWithdrawalStatus: (withdrawalId: string, status: WithdrawalRecord['status']) => Promise<void>;
   refreshData: () => void;
   stats: {
     totalApplications: number;
@@ -94,34 +123,20 @@ interface AppContextType {
 }
 
 const STORAGE_KEYS = {
-  USER: 'whfs_auth_user',
-  APPLICATIONS: 'whfs_applications_db',
+  APPLICATIONS: 'whfs_applications_local_cache',
   DONATIONS: 'whfs_donations_db',
-  ADMIN_AUTH: 'whfs_admin_authenticated',
   PAYMENTS: 'whfs_payments_ledger',
   WITHDRAWALS: 'whfs_withdrawals_ledger',
   PAYOUT_SETTINGS: 'whfs_payout_settings'
 };
 
-// Automatic cleanup on load: Remove any legacy demo / mock data
+// Remove legacy mock/demo caches on boot
 if (typeof window !== 'undefined') {
   try {
     localStorage.removeItem('demo_applicants');
     localStorage.removeItem('mock_payments');
-
-    const CLEAN_REGISTRY_FLAG = 'whfs_clean_registry_v1';
-    if (!localStorage.getItem(CLEAN_REGISTRY_FLAG)) {
-      localStorage.removeItem(STORAGE_KEYS.APPLICATIONS);
-      localStorage.removeItem(STORAGE_KEYS.PAYMENTS);
-      localStorage.removeItem(STORAGE_KEYS.WITHDRAWALS);
-      localStorage.removeItem(STORAGE_KEYS.DONATIONS);
-      const savedUser = localStorage.getItem(STORAGE_KEYS.USER);
-      if (savedUser && (savedUser.includes('amina.mwangi') || savedUser.includes('user-app-01'))) {
-        localStorage.removeItem(STORAGE_KEYS.USER);
-        localStorage.removeItem(STORAGE_KEYS.ADMIN_AUTH);
-      }
-      localStorage.setItem(CLEAN_REGISTRY_FLAG, 'true');
-    }
+    localStorage.removeItem('whfs_auth_user');
+    localStorage.removeItem('whfs_admin_authenticated');
 
     const CLEAN_PAYOUT_FLAG = 'whfs_clean_airtel_ke_v1';
     if (!localStorage.getItem(CLEAN_PAYOUT_FLAG)) {
@@ -129,21 +144,27 @@ if (typeof window !== 'undefined') {
       localStorage.setItem(CLEAN_PAYOUT_FLAG, 'true');
     }
   } catch (e) {
-    console.warn('Storage purge error:', e);
+    console.warn('Storage cleanup warning:', e);
   }
+}
+
+// Strip undefined properties before Firestore writes
+function removeUndefinedFields<T extends Record<string, unknown>>(obj: T): T {
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      cleaned[key] = value;
+    }
+  }
+  return cleaned as T;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.USER);
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [firebaseAuthError, setFirebaseAuthError] = useState<string | null>(null);
 
   const [applications, setApplications] = useState<HumanitarianApplication[]>(() => {
     try {
@@ -154,41 +175,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  const [donations, setDonations] = useState<DonationRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.DONATIONS);
-      return saved ? JSON.parse(saved) : INITIAL_DONATIONS;
-    } catch {
-      return INITIAL_DONATIONS;
-    }
-  });
-
-  const [payments, setPayments] = useState<RegistrationFeePayment[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.PAYMENTS);
-      return saved ? JSON.parse(saved) : INITIAL_PAYMENTS;
-    } catch {
-      return INITIAL_PAYMENTS;
-    }
-  });
-
-  const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.WITHDRAWALS);
-      return saved ? JSON.parse(saved) : INITIAL_WITHDRAWALS;
-    } catch {
-      return INITIAL_WITHDRAWALS;
-    }
-  });
-
-  const [payoutSettings, setPayoutSettings] = useState<PayoutAccountSettings>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.PAYOUT_SETTINGS);
-      return saved ? JSON.parse(saved) : DEFAULT_PAYOUT_SETTINGS;
-    } catch {
-      return DEFAULT_PAYOUT_SETTINGS;
-    }
-  });
+  const [donations, setDonations] = useState<DonationRecord[]>(INITIAL_DONATIONS);
+  const [payments, setPayments] = useState<RegistrationFeePayment[]>(INITIAL_PAYMENTS);
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>(INITIAL_WITHDRAWALS);
+  const [payoutSettings, setPayoutSettings] = useState<PayoutAccountSettings>(DEFAULT_PAYOUT_SETTINGS);
 
   const [activeTab, setActiveTabState] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -200,14 +190,170 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (hash === '#admin' || hash === '#/admin') {
         return 'admin';
       }
+      const route = path.replace(/^\//, '').split('/')[0];
+      return route || 'home';
     }
     return 'home';
   });
+
   const [selectedTrackingId, setSelectedTrackingId] = useState<string | null>(null);
-  const [preselectedProgramme, setPreselectedProgramme] = useState<{ name: string; category: ProgrammeCategory } | null>(null);
+  const [preselectedProgramme, setPreselectedProgramme] = useState<{
+    name: string;
+    category: ProgrammeCategory;
+  } | null>(null);
   const [toasts, setToasts] = useState<ToastState[]>([]);
 
-  // Listen for browser navigation changes (Back/Forward buttons)
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4500);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const setActiveTab = (tab: string) => {
+    setActiveTabState(tab);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // 1. Firebase Auth State Listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        const email = (firebaseUser.email || '').toLowerCase();
+        const isAdmin = isAdminEmail(email);
+        const profile: UserProfile = {
+          id: firebaseUser.uid,
+          name:
+            firebaseUser.displayName ||
+            (email === PRIMARY_ADMIN_EMAIL
+              ? 'Emmanuel Kipchirchir'
+              : email === 'admin@whfs.org'
+                ? 'Executive Foundation Officer'
+                : email.split('@')[0] || 'Applicant'),
+          email,
+          role: isAdmin ? 'admin' : 'applicant',
+          country: isAdmin ? 'Kenya' : 'Global Beneficiary'
+        };
+        setCurrentUser(profile);
+      } else {
+        setCurrentUser(null);
+      }
+      setAuthReady(true);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Load public payout settings document once on boot
+  useEffect(() => {
+    const loadPayout = async () => {
+      try {
+        const snap = await getDoc(doc(db, FIRESTORE_COLLECTIONS.SETTINGS, 'payout'));
+        if (snap.exists()) {
+          setPayoutSettings(snap.data() as PayoutAccountSettings);
+        }
+      } catch {
+        // Fallback to DEFAULT_PAYOUT_SETTINGS if document doesn't exist yet
+      }
+    };
+    loadPayout();
+  }, []);
+
+  // 2. Real-Time Firestore Listeners (Only attached when authReady and Admin is authenticated)
+  useEffect(() => {
+    const isAdmin = Boolean(currentUser && (isAdminEmail(currentUser.email) || currentUser.role === 'admin'));
+    if (!authReady || !isAdmin) return;
+
+    const unsubApps = onSnapshot(
+      collection(db, FIRESTORE_COLLECTIONS.APPLICATIONS),
+      (snapshot) => {
+        const list: HumanitarianApplication[] = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data() as HumanitarianApplication;
+          return {
+            ...data,
+            id: data.id || docSnap.id,
+            fullName: data.fullName || data.name || 'Applicant',
+            name: data.name || data.fullName || 'Applicant',
+            amountRequestedUSD: Number(data.amountRequestedUSD ?? data.amount ?? 0),
+            amount: Number(data.amount ?? data.amountRequestedUSD ?? 0),
+            createdAt: data.createdAt || data.date || new Date().toISOString(),
+            updatedAt: data.updatedAt || data.date || new Date().toISOString(),
+            documents: Array.isArray(data.documents) ? data.documents : [],
+            timeline: Array.isArray(data.timeline) ? data.timeline : []
+          };
+        });
+
+        list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        setApplications(list);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, FIRESTORE_COLLECTIONS.APPLICATIONS);
+      }
+    );
+
+    const unsubPayments = onSnapshot(
+      collection(db, FIRESTORE_COLLECTIONS.PAYMENTS),
+      (snapshot) => {
+        const list: RegistrationFeePayment[] = snapshot.docs.map((d) => d.data() as RegistrationFeePayment);
+        list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        setPayments(list);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, FIRESTORE_COLLECTIONS.PAYMENTS);
+      }
+    );
+
+    const unsubDonations = onSnapshot(
+      collection(db, FIRESTORE_COLLECTIONS.DONATIONS),
+      (snapshot) => {
+        const list: DonationRecord[] = snapshot.docs.map((d) => d.data() as DonationRecord);
+        list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        setDonations(list);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, FIRESTORE_COLLECTIONS.DONATIONS);
+      }
+    );
+
+    const unsubWithdrawals = onSnapshot(
+      collection(db, FIRESTORE_COLLECTIONS.WITHDRAWALS),
+      (snapshot) => {
+        const list: WithdrawalRecord[] = snapshot.docs.map((d) => d.data() as WithdrawalRecord);
+        list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        setWithdrawals(list);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, FIRESTORE_COLLECTIONS.WITHDRAWALS);
+      }
+    );
+
+    const unsubSettings = onSnapshot(
+      doc(db, FIRESTORE_COLLECTIONS.SETTINGS, 'payout'),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setPayoutSettings(docSnap.data() as PayoutAccountSettings);
+        }
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, `${FIRESTORE_COLLECTIONS.SETTINGS}/payout`);
+      }
+    );
+
+    return () => {
+      unsubApps();
+      unsubPayments();
+      unsubDonations();
+      unsubWithdrawals();
+      unsubSettings();
+    };
+  }, [authReady, currentUser?.id, currentUser?.email, currentUser?.role]);
+
+  // Listen for browser navigation changes
   useEffect(() => {
     const handlePopState = () => {
       const path = window.location.pathname;
@@ -222,168 +368,195 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Sync to local storage
+  // Cache submitted applications locally for same-device /track fallback when not admin
   useEffect(() => {
     try {
-      if (currentUser) {
-        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser));
-      } else {
-        localStorage.removeItem(STORAGE_KEYS.USER);
-        localStorage.removeItem(STORAGE_KEYS.ADMIN_AUTH);
-      }
-    } catch (e) {
-      console.warn('Storage sync failed:', e);
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(applications));
-    } catch (e) {
-      console.warn('Applications storage failed:', e);
+      localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(applications.slice(0, 50)));
+    } catch {
+      // Ignore quota exceeded for large local caches
     }
   }, [applications]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.DONATIONS, JSON.stringify(donations));
-    } catch (e) {
-      console.warn('Donations storage failed:', e);
-    }
-  }, [donations]);
-
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    const id = Math.random().toString(36).substring(2, 9);
-    setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 4500);
-  };
-
-  const removeToast = (id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  };
-
-  const setActiveTab = (tab: string) => {
-    setActiveTabState(tab);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
+  // 3. Admin Login with Firebase Authentication (creates user if not exists)
   const adminLogin = async (email: string, password: string): Promise<boolean> => {
+    setFirebaseAuthError(null);
     const normalizedEmail = email.trim().toLowerCase();
-    const authorizedAdminEmails = ['admin@whfs.org', 'kipchirchiremmanuel5000@gmail.com'];
-    if (authorizedAdminEmails.includes(normalizedEmail) && password === 'WHFS2026!') {
-      const adminUser: UserProfile = {
-        id: 'admin-whfs-01',
-        name: normalizedEmail === 'kipchirchiremmanuel5000@gmail.com' ? 'Emmanuel Kipchirchir' : 'Executive Foundation Officer',
-        email: normalizedEmail,
-        role: 'admin',
-        country: 'Switzerland',
-        organization: 'WHFS International Board of Trustees',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80'
-      };
-      setCurrentUser(adminUser);
-      localStorage.setItem(STORAGE_KEYS.ADMIN_AUTH, 'true');
-      showToast('Admin authentication verified. Welcome, Executive Officer.', 'success');
+
+    if (!isAdminEmail(normalizedEmail)) {
+      const msg = 'Unauthorized email. Only authorized Foundation Administrators can access /admin.';
+      setFirebaseAuthError(msg);
+      showToast(msg, 'error');
+      return false;
+    }
+
+    try {
+      await signInWithEmailAndPassword(auth, normalizedEmail, password);
+      showToast('Firebase Admin authentication verified. Welcome back.', 'success');
       return true;
-    } else {
-      showToast('Invalid admin credentials. Use authorized email and password', 'error');
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code || '';
+      const message = (err as { message?: string })?.message || 'Authentication failed';
+
+      // Create the requested Admin user in Firebase Auth if it does not exist yet
+      if (
+        (code === 'auth/user-not-found' || code === 'auth/invalid-credential') &&
+        normalizedEmail === PRIMARY_ADMIN_EMAIL &&
+        password === 'Kipchirchir5000'
+      ) {
+        try {
+          const created = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
+          await updateProfile(created.user, { displayName: 'Emmanuel Kipchirchir' });
+          showToast('Admin account created in Firebase Auth and signed in!', 'success');
+          return true;
+        } catch (createErr: unknown) {
+          const createCode = (createErr as { code?: string })?.code || '';
+          const createMsg = (createErr as { message?: string })?.message || 'Could not create admin account';
+
+          if (createCode === 'auth/email-already-in-use') {
+            const msg = 'Admin account already exists in Firebase Auth with a different password, or sign in with Google below.';
+            setFirebaseAuthError(msg);
+            showToast(msg, 'error');
+            return false;
+          }
+          if (createCode === 'auth/operation-not-allowed') {
+            const msg =
+              'Email/Password sign-in is disabled in Firebase Console (whfs-3f347). Enable Email/Password under Authentication > Sign-in method, or use Sign in with Google below.';
+            setFirebaseAuthError(msg);
+            showToast(msg, 'error');
+            return false;
+          }
+          setFirebaseAuthError(createMsg);
+          showToast(createMsg, 'error');
+          return false;
+        }
+      }
+
+      if (code === 'auth/operation-not-allowed') {
+        const msg =
+          'Email/Password sign-in is disabled in Firebase Console (whfs-3f347). Enable Email/Password under Authentication > Sign-in method, or click Sign in with Google below.';
+        setFirebaseAuthError(msg);
+        showToast(msg, 'error');
+        return false;
+      }
+
+      const friendly =
+        code === 'auth/wrong-password' || code === 'auth/invalid-credential'
+          ? 'Incorrect admin password or account credentials. You can also sign in with Google.'
+          : message;
+      setFirebaseAuthError(friendly);
+      showToast(friendly, 'error');
       return false;
     }
   };
 
-  const login = async (email: string, role: 'applicant' | 'admin' = 'applicant'): Promise<boolean> => {
-    const normalizedEmail = email.trim().toLowerCase();
-    let user: UserProfile;
-
-    if (normalizedEmail === 'admin@whfs.org' || normalizedEmail === 'kipchirchiremmanuel5000@gmail.com' || (role === 'admin' && normalizedEmail.includes('whfs-aid.org'))) {
-      user = {
-        id: 'admin-whfs-01',
-        name: normalizedEmail === 'kipchirchiremmanuel5000@gmail.com' ? 'Emmanuel Kipchirchir' : 'Executive Foundation Officer',
-        email: normalizedEmail,
-        role: 'admin',
-        country: 'Switzerland',
-        organization: 'WHFS International Board'
-      };
-      localStorage.setItem(STORAGE_KEYS.ADMIN_AUTH, 'true');
-      showToast('Welcome back, Foundation Officer', 'success');
-    } else {
-      user = {
-        id: 'user-' + Math.random().toString(36).substring(2, 7),
-        name: normalizedEmail.split('@')[0].replace(/[._]/g, ' ') || 'Applicant User',
-        email: normalizedEmail,
-        role: 'applicant',
-        country: 'Global Beneficiary'
-      };
-      localStorage.removeItem(STORAGE_KEYS.ADMIN_AUTH);
-      showToast('Signed in successfully to Applicant Portal', 'success');
+  const adminGoogleLogin = async (): Promise<boolean> => {
+    setFirebaseAuthError(null);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const email = (result.user.email || '').toLowerCase();
+      if (!isAdminEmail(email)) {
+        await signOut(auth);
+        const msg = `Access denied for ${email}. Only ${PRIMARY_ADMIN_EMAIL} is authorized.`;
+        setFirebaseAuthError(msg);
+        showToast(msg, 'error');
+        return false;
+      }
+      showToast(`Signed in via Google as ${email}`, 'success');
+      return true;
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message || 'Google sign-in cancelled or failed.';
+      setFirebaseAuthError(msg);
+      showToast(msg, 'error');
+      return false;
     }
-
-    setCurrentUser(user);
-    return true;
   };
 
-  const register = async (name: string, email: string, country: string, role: 'applicant' | 'admin' = 'applicant'): Promise<boolean> => {
-    const newUser: UserProfile = {
-      id: 'user-' + Date.now(),
-      name,
-      email: email.trim().toLowerCase(),
-      country,
-      role
-    };
-    setCurrentUser(newUser);
-    showToast(`Account created successfully for ${name}`, 'success');
-    return true;
+  const login = async (email: string, password?: string): Promise<boolean> => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (isAdminEmail(normalizedEmail)) {
+      return adminLogin(normalizedEmail, password || '');
+    }
+    try {
+      if (password) {
+        await signInWithEmailAndPassword(auth, normalizedEmail, password);
+      } else {
+        await signInWithPopup(auth, googleProvider);
+      }
+      showToast('Signed in successfully to Applicant Portal', 'success');
+      return true;
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message || 'Sign in failed. Please verify your credentials.';
+      showToast(msg, 'error');
+      return false;
+    }
   };
 
-  const logout = () => {
+  const register = async (
+    name: string,
+    email: string,
+    _country: string,
+    password?: string
+  ): Promise<boolean> => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (isAdminEmail(normalizedEmail)) {
+      showToast('Administrator accounts must sign in via /admin.', 'error');
+      return false;
+    }
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, normalizedEmail, password || 'WhfsApplicant2026!');
+      await updateProfile(cred.user, { displayName: name });
+      showToast(`Account created successfully for ${name}`, 'success');
+      return true;
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message || 'Account creation failed.';
+      showToast(msg, 'error');
+      return false;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.warn('Sign out warning:', e);
+    }
     setCurrentUser(null);
-    localStorage.removeItem(STORAGE_KEYS.ADMIN_AUTH);
+    setApplications([]);
+    setPayments([]);
+    setWithdrawals([]);
+    setDonations([]);
     showToast('You have been signed out', 'info');
     if (activeTab === 'admin') {
       setActiveTab('home');
     }
   };
 
-  const switchRoleDemo = (role: 'applicant' | 'admin') => {
-    if (role === 'admin') {
-      const adminUser: UserProfile = {
-        id: 'admin-whfs-01',
-        name: 'Emmanuel Kipchirchir',
-        email: 'kipchirchiremmanuel5000@gmail.com',
-        role: 'admin',
-        country: 'Switzerland'
-      };
-      setCurrentUser(adminUser);
-      localStorage.setItem(STORAGE_KEYS.ADMIN_AUTH, 'true');
-      showToast('Switched to Administrator view', 'info');
-    } else {
-      setCurrentUser(null);
-      localStorage.removeItem(STORAGE_KEYS.ADMIN_AUTH);
-      showToast('Signed out of admin view', 'info');
-    }
-  };
-
-  const submitApplication = async (data: Partial<HumanitarianApplication>): Promise<HumanitarianApplication> => {
+  // 4. Submit Application -> Saves to Cloud Firestore "applications" collection
+  const submitApplication = async (
+    data: Partial<HumanitarianApplication>
+  ): Promise<HumanitarianApplication> => {
     const randomCode = Math.floor(10000 + Math.random() * 90000);
     const countryName = data.country || 'Zambia';
-    const regionCode = countryName.substring(0, 2).toUpperCase();
+    const regionCode = countryName.substring(0, 2).toUpperCase().replace(/[^A-Z]/g, 'XX');
     const generatedId = `WHFS-2026-${regionCode}-${randomCode}`;
     const timestamp = new Date().toISOString();
 
     const curr = getCurrency(countryName);
-    const usdAmount = Number(data.amountRequestedUSD) || 100;
+    const usdAmount = Number(data.amountRequestedUSD ?? data.amount) || 100;
     const localAmount = data.amountRequestedLocal || Math.round(usdAmount * curr.rate);
     const localFee = Math.round(DEFAULT_REGISTRATION_FEE_USD * curr.rate);
     const localDisplay = data.localCurrencyDisplay || formatFundingDisplay(usdAmount, countryName);
     const feeDisplay = data.registrationFeeLocal || `${curr.symbol} ${localFee.toLocaleString()} ${curr.code}`;
+    const applicantName = (data.fullName || data.name || currentUser?.name || 'Applicant').trim();
+    const applicantNeed = (data.need || data.statementOfNeed || data.programmeName || 'Humanitarian support').trim();
 
-    const newApp: HumanitarianApplication = {
+    const newApp: HumanitarianApplication = removeUndefinedFields({
       id: generatedId,
-      userId: currentUser?.id || 'guest-' + Date.now(),
-      fullName: data.fullName || (currentUser?.name ?? 'Applicant'),
-      email: data.email || (currentUser?.email ?? 'applicant@whfs.org'),
-      phone: data.phone || '',
+      userId: auth.currentUser?.uid || currentUser?.id || `guest-${Date.now()}`,
+      name: applicantName,
+      fullName: applicantName,
+      email: (data.email || currentUser?.email || 'applicant@whfs.org').trim(),
+      phone: (data.phone || '').trim(),
       dateOfBirth: data.dateOfBirth || '2000-01-01',
       gender: data.gender || 'Not specified',
       country: countryName,
@@ -392,13 +565,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       programmeCategory: data.programmeCategory || 'education',
       programmeName: data.programmeName || 'Global Academic Scholarship Programme (GASP)',
       institutionOrCommunity: data.institutionOrCommunity || '',
+      need: applicantNeed,
       financialNeedLevel: data.financialNeedLevel || 'High Need',
       householdIncomeBracket: data.householdIncomeBracket || 'Under $1,500 USD',
-      dependentsCount: data.dependentsCount || 1,
+      dependentsCount: Number(data.dependentsCount) || 1,
       displacementStatus: data.displacementStatus || 'Not Displaced',
-      statementOfNeed: data.statementOfNeed || '',
+      statementOfNeed: data.statementOfNeed || applicantNeed,
+      amount: usdAmount,
       amountRequestedUSD: usdAmount,
-      // Local currency saved to database & state
       amountRequestedLocal: localAmount,
       localCurrencyCode: data.localCurrencyCode || curr.code,
       localCurrencySymbol: data.localCurrencySymbol || curr.symbol,
@@ -407,53 +581,67 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       countryFlag: data.countryFlag || curr.flag,
       registrationFeeUSD: data.registrationFeeUSD || DEFAULT_REGISTRATION_FEE_USD,
       registrationFeeLocal: feeDisplay,
-      status: 'Submitted',
-      documents: data.documents || [
-        {
-          id: 'doc-auto-1',
-          name: 'Identity_Verification_Document.pdf',
-          type: 'PDF',
-          size: '1.4 MB',
-          status: 'verified',
-          uploadedAt: timestamp.split('T')[0]
-        },
-        {
-          id: 'doc-auto-2',
-          name: 'Statement_of_Hardship_Certificate.pdf',
-          type: 'PDF',
-          size: '2.1 MB',
-          status: 'pending',
-          uploadedAt: timestamp.split('T')[0]
-        }
-      ],
+      receiptImageUrl: data.receiptImageUrl || '',
+      status: 'pending' as ApplicationStatus,
+      date: timestamp,
+      documents: data.documents || [],
       timeline: [
         {
           date: timestamp.split('T')[0],
           title: 'Application Lodged Online',
-          description: `Official application received into WHFS worldwide grants registry (${curr.flag} ${curr.country} intake).`,
+          description: `Official application saved to WHFS Cloud Registry (${curr.flag} ${curr.country} intake).`,
           officer: 'Automated Intake Desk'
         }
       ],
-      // Payment state attributes
       hasPaidRegistrationFee: Boolean(data.hasPaidRegistrationFee),
       paymentMethod: data.paymentMethod || 'Airtel Money',
-      paymentTransactionId: data.paymentTransactionId || (data.hasPaidRegistrationFee ? `TXN-${Math.floor(100000 + Math.random() * 900000)}` : undefined),
-      paymentStatus: data.hasPaidRegistrationFee ? (data.paymentStatus || 'Paid') : 'Unpaid',
-      paymentDate: data.hasPaidRegistrationFee ? timestamp.split('T')[0] : undefined,
+      paymentTransactionId:
+        data.paymentTransactionId ||
+        (data.hasPaidRegistrationFee ? `TXN-${Math.floor(100000 + Math.random() * 900000)}` : ''),
+      paymentStatus: data.hasPaidRegistrationFee ? data.paymentStatus || 'Paid' : 'Unpaid',
+      paymentDate: data.hasPaidRegistrationFee ? timestamp.split('T')[0] : '',
       createdAt: timestamp,
       updatedAt: timestamp
-    };
+    });
 
-    setApplications(prev => [newApp, ...prev]);
+    const appPath = `${FIRESTORE_COLLECTIONS.APPLICATIONS}/${generatedId}`;
+    try {
+      await setDoc(doc(db, FIRESTORE_COLLECTIONS.APPLICATIONS, generatedId), newApp);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, appPath);
+    }
 
-    // If applicant checked 'I have paid' or provided payment transaction reference, add entry into Payments Ledger
+    // Write PII-free public status mirror for /track lookup
+    const publicStatusDoc = removeUndefinedFields({
+      id: generatedId,
+      country: countryName,
+      countryFlag: curr.flag,
+      programmeCategory: newApp.programmeCategory,
+      programmeName: newApp.programmeName,
+      amountRequestedUSD: usdAmount,
+      localCurrencyDisplay: localDisplay,
+      status: 'pending',
+      date: timestamp,
+      updatedAt: timestamp,
+      timeline: newApp.timeline
+    });
+
+    try {
+      await setDoc(doc(db, FIRESTORE_COLLECTIONS.APPLICATION_STATUS, generatedId), publicStatusDoc);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `${FIRESTORE_COLLECTIONS.APPLICATION_STATUS}/${generatedId}`);
+    }
+
+    // Record payment into Firestore payments collection if fee paid
     if (data.hasPaidRegistrationFee) {
-      const paymentRef = data.paymentTransactionId?.trim() || `TXN-${Math.floor(100000 + Math.random() * 900000)}`;
-      const newPayment: RegistrationFeePayment = {
-        id: `WHFS-PAY-2026-${Math.floor(100 + Math.random() * 900)}`,
+      const payId = `WHFS-PAY-2026-${Math.floor(100 + Math.random() * 900)}`;
+      const paymentRef =
+        data.paymentTransactionId?.trim() || `TXN-${Math.floor(100000 + Math.random() * 900000)}`;
+      const newPayment: RegistrationFeePayment = removeUndefinedFields({
+        id: payId,
         applicationId: generatedId,
-        applicantName: data.fullName || (currentUser?.name ?? 'Applicant'),
-        applicantEmail: data.email || (currentUser?.email ?? 'applicant@whfs.org'),
+        applicantName,
+        applicantEmail: newApp.email,
         country: countryName,
         countryFlag: curr.flag,
         amountUSD: data.registrationFeeUSD || DEFAULT_REGISTRATION_FEE_USD,
@@ -462,40 +650,185 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currencySymbol: curr.symbol,
         paymentMethod: data.paymentMethod || 'Airtel Money',
         transactionReference: paymentRef,
+        receiptImageUrl: data.receiptImageUrl || '',
         date: timestamp.split('T')[0],
         status: data.paymentStatus || 'Paid',
         notes: `Application registration intake fee for ${generatedId}`
-      };
-      setPayments(prev => [newPayment, ...prev]);
+      });
+
+      try {
+        await setDoc(doc(db, FIRESTORE_COLLECTIONS.PAYMENTS, payId), newPayment);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, `${FIRESTORE_COLLECTIONS.PAYMENTS}/${payId}`);
+      }
     }
 
-    showToast(`Application ${generatedId} lodged in local currency (${curr.code})!`, 'success');
+    setApplications((prev) => [newApp, ...prev.filter((a) => a.id !== newApp.id)]);
+    showToast(`Application ${generatedId} saved to Firestore!`, 'success');
     return newApp;
   };
 
-  // Sync payments and withdrawals to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(payments));
-    } catch (e) {
-      console.warn('LocalStorage error saving payments', e);
-    }
-  }, [payments]);
+  // Lookup application for TrackingPage (checks local cache + public Firestore status mirror)
+  const lookupApplicationById = async (trackingId: string): Promise<HumanitarianApplication | null> => {
+    const cleanId = trackingId.trim();
+    const localHit = applications.find(
+      (a) => a.id.toLowerCase() === cleanId.toLowerCase()
+    );
+    if (localHit) return localHit;
 
-  useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEYS.WITHDRAWALS, JSON.stringify(withdrawals));
-    } catch (e) {
-      console.warn('LocalStorage error saving withdrawals', e);
+      const snap = await getDoc(doc(db, FIRESTORE_COLLECTIONS.APPLICATION_STATUS, cleanId));
+      if (!snap.exists()) return null;
+      const pub = snap.data();
+      return {
+        id: pub.id,
+        userId: 'public-lookup',
+        fullName: 'Verified Applicant',
+        name: 'Verified Applicant',
+        email: '',
+        phone: '',
+        dateOfBirth: '',
+        gender: '',
+        country: pub.country || 'Zambia',
+        countryFlag: pub.countryFlag || '🌍',
+        region: '',
+        address: '',
+        programmeCategory: pub.programmeCategory || 'education',
+        programmeName: pub.programmeName || 'WHFS Grant Programme',
+        institutionOrCommunity: '',
+        financialNeedLevel: 'High Need',
+        householdIncomeBracket: '',
+        dependentsCount: 0,
+        displacementStatus: 'Not Displaced',
+        statementOfNeed: '',
+        amountRequestedUSD: Number(pub.amountRequestedUSD || 0),
+        amountAwardedUSD: pub.amountAwardedUSD ? Number(pub.amountAwardedUSD) : undefined,
+        localCurrencyDisplay: pub.localCurrencyDisplay || '',
+        status: pub.status as ApplicationStatus,
+        committeeNotes: pub.committeeNotes,
+        documents: [],
+        timeline: Array.isArray(pub.timeline) ? pub.timeline : [],
+        createdAt: pub.date || new Date().toISOString(),
+        updatedAt: pub.updatedAt || pub.date || new Date().toISOString()
+      };
+    } catch {
+      return null;
     }
-  }, [withdrawals]);
+  };
 
-  const recordRegistrationPayment = async (paymentData: Partial<RegistrationFeePayment>): Promise<RegistrationFeePayment> => {
+  const updateApplicationStatus = async (
+    id: string,
+    newStatus: ApplicationStatus,
+    officerNotes?: string,
+    amountAwardedUSD?: number
+  ) => {
+    const today = new Date().toISOString().split('T')[0];
+    const nowIso = new Date().toISOString();
+    const existingApp = applications.find((a) => a.id === id);
+
+    const newEvent = {
+      date: today,
+      title: `Status updated to ${newStatus}`,
+      description: officerNotes || 'Evaluation completed by Foundation Grants Officer.',
+      officer: currentUser?.name || 'Foundation Review Officer'
+    };
+
+    const nextTimeline = existingApp ? [newEvent, ...(existingApp.timeline || [])] : [newEvent];
+    const nextAward =
+      amountAwardedUSD !== undefined
+        ? amountAwardedUSD
+        : newStatus === 'Approved' || newStatus === 'approved' || newStatus === 'Disbursed'
+          ? existingApp?.amountRequestedUSD || 0
+          : existingApp?.amountAwardedUSD;
+
+    const appUpdate = removeUndefinedFields({
+      status: newStatus,
+      committeeNotes: officerNotes !== undefined ? officerNotes : existingApp?.committeeNotes || '',
+      amountAwardedUSD: nextAward,
+      updatedAt: nowIso,
+      timeline: nextTimeline
+    });
+
+    try {
+      await updateDoc(doc(db, FIRESTORE_COLLECTIONS.APPLICATIONS, id), appUpdate);
+      await updateDoc(doc(db, FIRESTORE_COLLECTIONS.APPLICATION_STATUS, id), appUpdate).catch(() => {});
+      showToast(`Application ${id} updated to "${newStatus}" in Firestore`, 'success');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `${FIRESTORE_COLLECTIONS.APPLICATIONS}/${id}`);
+    }
+  };
+
+  const approveApplication = async (id: string, amount?: number) => {
+    const today = new Date().toISOString().split('T')[0];
+    const nowIso = new Date().toISOString();
+    const existingApp = applications.find((a) => a.id === id);
+    const awarded = amount !== undefined ? amount : existingApp?.amountRequestedUSD || 100;
+
+    const newEvent = {
+      date: today,
+      title: 'Grant Proposal Approved',
+      description: `Executive Grant Committee approved full aid allocation of $${awarded.toLocaleString()} USD.`,
+      officer: currentUser?.name || 'Executive Foundation Officer'
+    };
+
+    const nextTimeline = existingApp ? [newEvent, ...(existingApp.timeline || [])] : [newEvent];
+    const payload = {
+      status: 'approved' as ApplicationStatus,
+      amountAwardedUSD: awarded,
+      committeeNotes:
+        'Application approved by Foundation Review Board. Dispatches authorized pursuant to compliance criteria.',
+      updatedAt: nowIso,
+      timeline: nextTimeline
+    };
+
+    try {
+      await updateDoc(doc(db, FIRESTORE_COLLECTIONS.APPLICATIONS, id), payload);
+      await updateDoc(doc(db, FIRESTORE_COLLECTIONS.APPLICATION_STATUS, id), payload).catch(() => {});
+      showToast(`Application ${id} Approved in Firestore!`, 'success');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `${FIRESTORE_COLLECTIONS.APPLICATIONS}/${id}`);
+    }
+  };
+
+  const rejectApplication = async (id: string, reason?: string) => {
+    const today = new Date().toISOString().split('T')[0];
+    const nowIso = new Date().toISOString();
+    const existingApp = applications.find((a) => a.id === id);
+    const rejectionReason =
+      reason || 'Proposal does not satisfy current cohort regional allocation criteria.';
+
+    const newEvent = {
+      date: today,
+      title: 'Application Rejected',
+      description: rejectionReason,
+      officer: currentUser?.name || 'Executive Foundation Officer'
+    };
+
+    const nextTimeline = existingApp ? [newEvent, ...(existingApp.timeline || [])] : [newEvent];
+    const payload = {
+      status: 'rejected' as ApplicationStatus,
+      committeeNotes: rejectionReason,
+      updatedAt: nowIso,
+      timeline: nextTimeline
+    };
+
+    try {
+      await updateDoc(doc(db, FIRESTORE_COLLECTIONS.APPLICATIONS, id), payload);
+      await updateDoc(doc(db, FIRESTORE_COLLECTIONS.APPLICATION_STATUS, id), payload).catch(() => {});
+      showToast(`Application ${id} marked Rejected in Firestore.`, 'info');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `${FIRESTORE_COLLECTIONS.APPLICATIONS}/${id}`);
+    }
+  };
+
+  const recordRegistrationPayment = async (
+    paymentData: Partial<RegistrationFeePayment>
+  ): Promise<RegistrationFeePayment> => {
     const payId = `WHFS-PAY-2026-${Math.floor(100 + Math.random() * 900)}`;
     const date = new Date().toISOString().split('T')[0];
     const curr = getCurrency(paymentData.country || 'Zambia');
 
-    const newPayment: RegistrationFeePayment = {
+    const newPayment: RegistrationFeePayment = removeUndefinedFields({
       id: payId,
       applicationId: paymentData.applicationId || 'INTAKE-MANUAL',
       applicantName: paymentData.applicantName || 'Applicant',
@@ -503,44 +836,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       country: paymentData.country || 'Zambia',
       countryFlag: paymentData.countryFlag || curr.flag,
       amountUSD: Number(paymentData.amountUSD) || 10,
-      amountLocal: Number(paymentData.amountLocal) || (10 * curr.rate),
+      amountLocal: Number(paymentData.amountLocal) || 10 * curr.rate,
       currencyCode: paymentData.currencyCode || curr.code,
       currencySymbol: paymentData.currencySymbol || curr.symbol,
       paymentMethod: paymentData.paymentMethod || 'Airtel Money',
-      transactionReference: paymentData.transactionReference || `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
+      transactionReference:
+        paymentData.transactionReference || `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
+      receiptImageUrl: paymentData.receiptImageUrl || '',
       date: paymentData.date || date,
       status: paymentData.status || 'Paid',
       notes: paymentData.notes || 'Recorded via WHFS Intake Portal'
-    };
+    });
 
-    setPayments(prev => [newPayment, ...prev]);
-    showToast(`Payment ${payId} recorded successfully (${newPayment.currencySymbol} ${newPayment.amountLocal.toLocaleString()} ${newPayment.currencyCode})`, 'success');
+    try {
+      await setDoc(doc(db, FIRESTORE_COLLECTIONS.PAYMENTS, payId), newPayment);
+      showToast(
+        `Payment ${payId} saved (${newPayment.currencySymbol} ${newPayment.amountLocal.toLocaleString()} ${newPayment.currencyCode})`,
+        'success'
+      );
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `${FIRESTORE_COLLECTIONS.PAYMENTS}/${payId}`);
+    }
     return newPayment;
   };
 
-  const updatePaymentStatus = (paymentId: string, status: RegistrationFeePayment['status']) => {
-    setPayments(prev => prev.map(p => {
-      if (p.id !== paymentId) return p;
-      return { ...p, status };
-    }));
-    showToast(`Payment ${paymentId} status updated to ${status}`, 'info');
+  const updatePaymentStatus = async (
+    paymentId: string,
+    status: RegistrationFeePayment['status']
+  ) => {
+    try {
+      await updateDoc(doc(db, FIRESTORE_COLLECTIONS.PAYMENTS, paymentId), { status });
+      showToast(`Payment ${paymentId} status updated to ${status}`, 'info');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `${FIRESTORE_COLLECTIONS.PAYMENTS}/${paymentId}`);
+    }
   };
 
-  const updatePayoutSettings = (newSettings: Partial<PayoutAccountSettings>) => {
-    setPayoutSettings(prev => {
-      const updated: PayoutAccountSettings = {
-        ...prev,
-        ...newSettings,
-        updatedAt: new Date().toISOString()
-      };
-      try {
-        localStorage.setItem(STORAGE_KEYS.PAYOUT_SETTINGS, JSON.stringify(updated));
-      } catch (e) {
-        console.warn('LocalStorage error saving payout settings', e);
-      }
-      return updated;
-    });
-    showToast('Payment methods and receiving accounts updated successfully!', 'success');
+  const updatePayoutSettings = async (newSettings: Partial<PayoutAccountSettings>) => {
+    const updated: PayoutAccountSettings = {
+      ...payoutSettings,
+      ...newSettings,
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      await setDoc(doc(db, FIRESTORE_COLLECTIONS.SETTINGS, 'payout'), updated);
+      setPayoutSettings(updated);
+      showToast('Treasury payout account saved to Firestore!', 'success');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `${FIRESTORE_COLLECTIONS.SETTINGS}/payout`);
+    }
   };
 
   const requestWithdrawal = async (data: {
@@ -551,7 +896,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     notes?: string;
   }): Promise<WithdrawalRecord> => {
     const amountUSD = Number(data.amountUSD);
-    const zmwRate = 27; // Zambia official rate
+    const zmwRate = 27;
     const amountZMW = Math.round(amountUSD * zmwRate);
 
     if (amountUSD <= 0) {
@@ -559,10 +904,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       throw new Error('Invalid withdrawal amount');
     }
 
-    // Check available balance
     const availableUSD = financialMetrics.currentBalanceUSD;
     if (amountUSD > availableUSD) {
-      showToast(`Insufficient balance. Current balance is $${availableUSD.toLocaleString()} USD (K ${Math.round(availableUSD * zmwRate).toLocaleString()} ZMW)`, 'error');
+      showToast(
+        `Insufficient balance. Current balance is $${availableUSD.toLocaleString()} USD`,
+        'error'
+      );
       throw new Error('Insufficient balance');
     }
 
@@ -571,7 +918,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const cleanMethod = data.method.toUpperCase().replace(/\s+/g, '');
     const refCode = `TXN-${cleanMethod}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const newWithdrawal: WithdrawalRecord = {
+    const newWithdrawal: WithdrawalRecord = removeUndefinedFields({
       id: wthId,
       amountUSD,
       amountZMW,
@@ -580,130 +927,68 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       recipientName: data.recipientName,
       requestedBy: currentUser?.name || 'Executive Foundation Officer',
       date: today,
-      status: 'Completed',
+      status: 'Completed' as const,
       referenceCode: refCode,
       notes: data.notes || `Withdrawal payout to ${data.recipientName} via ${data.method}`
-    };
+    });
 
-    setWithdrawals(prev => [newWithdrawal, ...prev]);
-    showToast(`Withdrawal of $${amountUSD.toLocaleString()} USD (K ${amountZMW.toLocaleString()} ZMW) processed! Ref: ${refCode}`, 'success');
+    try {
+      await setDoc(doc(db, FIRESTORE_COLLECTIONS.WITHDRAWALS, wthId), newWithdrawal);
+      showToast(
+        `Withdrawal of $${amountUSD.toLocaleString()} USD processed! Ref: ${refCode}`,
+        'success'
+      );
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `${FIRESTORE_COLLECTIONS.WITHDRAWALS}/${wthId}`);
+    }
     return newWithdrawal;
   };
 
-  const updateWithdrawalStatus = (withdrawalId: string, status: WithdrawalRecord['status']) => {
-    setWithdrawals(prev => prev.map(w => {
-      if (w.id !== withdrawalId) return w;
-      return { ...w, status };
-    }));
-    showToast(`Withdrawal ${withdrawalId} status set to ${status}`, 'info');
-  };
-
-  const updateApplicationStatus = (
-    id: string, 
-    newStatus: ApplicationStatus, 
-    officerNotes?: string, 
-    amountAwardedUSD?: number
+  const updateWithdrawalStatus = async (
+    withdrawalId: string,
+    status: WithdrawalRecord['status']
   ) => {
-    const today = new Date().toISOString().split('T')[0];
-    setApplications(prev => prev.map(app => {
-      if (app.id !== id) return app;
-      
-      const newEvent = {
-        date: today,
-        title: `Status updated to ${newStatus}`,
-        description: officerNotes || `Evaluation completed by Foundation Grants Officer.`,
-        officer: currentUser?.name || 'Foundation Review Officer'
-      };
-
-      return {
-        ...app,
-        status: newStatus,
-        committeeNotes: officerNotes !== undefined ? officerNotes : app.committeeNotes,
-        amountAwardedUSD: amountAwardedUSD !== undefined ? amountAwardedUSD : (newStatus === 'Approved' || newStatus === 'Disbursed' ? app.amountRequestedUSD : app.amountAwardedUSD),
-        updatedAt: new Date().toISOString(),
-        timeline: [newEvent, ...app.timeline]
-      };
-    }));
-
-    showToast(`Application ${id} updated to "${newStatus}"`, 'success');
+    try {
+      await updateDoc(doc(db, FIRESTORE_COLLECTIONS.WITHDRAWALS, withdrawalId), { status });
+      showToast(`Withdrawal ${withdrawalId} status set to ${status}`, 'info');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `${FIRESTORE_COLLECTIONS.WITHDRAWALS}/${withdrawalId}`);
+    }
   };
 
-  const approveApplication = (id: string, amount?: number) => {
-    const today = new Date().toISOString().split('T')[0];
-    setApplications(prev => prev.map(app => {
-      if (app.id !== id) return app;
-      const awarded = amount !== undefined ? amount : (app.amountRequestedUSD || 2500);
-      const newEvent = {
-        date: today,
-        title: 'Grant Proposal Approved',
-        description: `Executive Grant Committee approved full aid allocation of $${awarded.toLocaleString()} USD.`,
-        officer: currentUser?.name || 'Executive Foundation Officer'
-      };
-      return {
-        ...app,
-        status: 'Approved' as ApplicationStatus,
-        amountAwardedUSD: awarded,
-        committeeNotes: 'Application approved by Foundation Review Board. Dispatches authorized pursuant to compliance criteria.',
-        updatedAt: new Date().toISOString(),
-        timeline: [newEvent, ...app.timeline]
-      };
-    }));
-    showToast(`Application ${id} has been Approved!`, 'success');
-  };
-
-  const rejectApplication = (id: string, reason?: string) => {
-    const today = new Date().toISOString().split('T')[0];
-    setApplications(prev => prev.map(app => {
-      if (app.id !== id) return app;
-      const rejectionReason = reason || 'Proposal does not satisfy current cohort regional allocation criteria.';
-      const newEvent = {
-        date: today,
-        title: 'Application Rejected',
-        description: rejectionReason,
-        officer: currentUser?.name || 'Executive Foundation Officer'
-      };
-      return {
-        ...app,
-        status: 'Rejected' as ApplicationStatus,
-        committeeNotes: rejectionReason,
-        updatedAt: new Date().toISOString(),
-        timeline: [newEvent, ...app.timeline]
-      };
-    }));
-    showToast(`Application ${id} has been marked as Rejected.`, 'info');
-  };
-
-  const recordDonation = async (data: Omit<DonationRecord, 'id' | 'date' | 'receiptNumber'>): Promise<DonationRecord> => {
+  const recordDonation = async (
+    data: Omit<DonationRecord, 'id' | 'date' | 'receiptNumber'>
+  ): Promise<DonationRecord> => {
     const recNumber = `REC-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newDonation: DonationRecord = {
+    const donId = `WHFS-DON-${Math.floor(1000 + Math.random() * 9000)}`;
+    const newDonation: DonationRecord = removeUndefinedFields({
       ...data,
-      id: `WHFS-DON-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: donId,
       date: new Date().toISOString().split('T')[0],
       receiptNumber: recNumber
-    };
+    });
 
-    setDonations(prev => [newDonation, ...prev]);
-    showToast(`Thank you! Official donation receipt #${recNumber} generated.`, 'success');
+    try {
+      await setDoc(doc(db, FIRESTORE_COLLECTIONS.DONATIONS, donId), newDonation);
+      showToast(`Thank you! Official donation receipt #${recNumber} generated.`, 'success');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `${FIRESTORE_COLLECTIONS.DONATIONS}/${donId}`);
+    }
     return newDonation;
   };
 
   const refreshData = () => {
-    setApplications(INITIAL_APPLICATIONS);
-    setDonations(INITIAL_DONATIONS);
-    setPayments(INITIAL_PAYMENTS);
-    setWithdrawals(INITIAL_WITHDRAWALS);
-    setPayoutSettings(DEFAULT_PAYOUT_SETTINGS);
-    showToast('Database reset to initial humanitarian registry baseline', 'info');
+    showToast('Live Firestore stream is active.', 'info');
   };
 
-  // Financial Metrics (Registration Fees & Withdrawals)
+  // Financial Metrics
   const totalCollectedUSD = payments
-    .filter(p => p.status === 'Paid')
+    .filter((p) => p.status === 'Paid')
     .reduce((sum, p) => sum + p.amountUSD, 0);
   const totalCollectedZMW = totalCollectedUSD * 27;
 
   const totalWithdrawnUSD = withdrawals
-    .filter(w => w.status === 'Completed')
+    .filter((w) => w.status === 'Completed')
     .reduce((sum, w) => sum + w.amountUSD, 0);
   const totalWithdrawnZMW = totalWithdrawnUSD * 27;
 
@@ -717,16 +1002,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     totalWithdrawnZMW,
     currentBalanceUSD,
     currentBalanceZMW,
-    paidCount: payments.filter(p => p.status === 'Paid').length,
-    pendingCount: payments.filter(p => p.status === 'Pending Verification').length
+    paidCount: payments.filter((p) => p.status === 'Paid').length,
+    pendingCount: payments.filter((p) => p.status === 'Pending Verification').length
   };
 
   // Aggregated Stats
-  const approvedCount = applications.filter(a => a.status === 'Approved' || a.status === 'Disbursed').length;
+  const approvedCount = applications.filter((a) => {
+    const s = String(a.status).toLowerCase();
+    return s === 'approved' || s === 'disbursed';
+  }).length;
+  const pendingCount = applications.filter((a) => {
+    const s = String(a.status).toLowerCase();
+    return s === 'pending' || s === 'submitted' || s === 'under review';
+  }).length;
   const computedLives = approvedCount * 1250;
   const stats = {
     totalApplications: applications.length,
-    pendingReview: applications.filter(a => a.status === 'Submitted' || a.status === 'Under Review').length,
+    pendingReview: pendingCount,
     approvedOrDisbursed: approvedCount,
     totalDisbursedUSD: applications.reduce((sum, a) => sum + (a.amountAwardedUSD || 0), 0),
     totalDonationsUSD: donations.reduce((sum, d) => sum + d.amount, 0),
@@ -734,41 +1026,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   return (
-    <AppContext.Provider value={{
-      currentUser,
-      applications,
-      donations,
-      payments,
-      withdrawals,
-      payoutSettings,
-      financialMetrics,
-      activeTab,
-      setActiveTab,
-      selectedTrackingId,
-      setSelectedTrackingId,
-      preselectedProgramme,
-      setPreselectedProgramme,
-      toasts,
-      showToast,
-      removeToast,
-      login,
-      adminLogin,
-      register,
-      logout,
-      switchRoleDemo,
-      submitApplication,
-      updateApplicationStatus,
-      approveApplication,
-      rejectApplication,
-      recordDonation,
-      recordRegistrationPayment,
-      updatePaymentStatus,
-      updatePayoutSettings,
-      requestWithdrawal,
-      updateWithdrawalStatus,
-      refreshData,
-      stats
-    }}>
+    <AppContext.Provider
+      value={{
+        currentUser,
+        authReady,
+        firebaseAuthError,
+        applications,
+        donations,
+        payments,
+        withdrawals,
+        payoutSettings,
+        financialMetrics,
+        activeTab,
+        setActiveTab,
+        selectedTrackingId,
+        setSelectedTrackingId,
+        preselectedProgramme,
+        setPreselectedProgramme,
+        toasts,
+        showToast,
+        removeToast,
+        login,
+        adminLogin,
+        adminGoogleLogin,
+        register,
+        logout,
+        submitApplication,
+        lookupApplicationById,
+        updateApplicationStatus,
+        approveApplication,
+        rejectApplication,
+        recordDonation,
+        recordRegistrationPayment,
+        updatePaymentStatus,
+        updatePayoutSettings,
+        requestWithdrawal,
+        updateWithdrawalStatus,
+        refreshData,
+        stats
+      }}
+    >
       {children}
     </AppContext.Provider>
   );

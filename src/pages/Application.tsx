@@ -21,7 +21,8 @@ import {
   CreditCard,
   Wallet,
   Smartphone,
-  Landmark
+  Landmark,
+  Image as ImageIcon
 } from 'lucide-react';
 import { EDUCATION_PROGRAMMES, HUMANITARIAN_PROGRAMMES } from '../data/mockData';
 import { HumanitarianApplication, ProgrammeCategory } from '../types';
@@ -33,6 +34,7 @@ import {
   CurrencyInfo 
 } from '../data/allCurrencies';
 import { MTNPaymentModal } from '../components/MTNPaymentModal';
+import { RegionalPaymentModal, RegionalPaymentChannel } from '../components/RegionalPaymentModal';
 
 export const Application: React.FC = () => {
   const { 
@@ -50,6 +52,7 @@ export const Application: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedApp, setSubmittedApp] = useState<HumanitarianApplication | null>(null);
   const [isMTNModalOpen, setIsMTNModalOpen] = useState(false);
+  const [regionalModalChannel, setRegionalModalChannel] = useState<RegionalPaymentChannel | null>(null);
 
   // Local currency & Country State - Default country Zambia as specified
   const [selectedCountry, setSelectedCountry] = useState<string>('Zambia');
@@ -96,6 +99,7 @@ export const Application: React.FC = () => {
     hasPaidRegistrationFee: false,
     paymentMethod: 'MTN Zambia',
     paymentTransactionId: '',
+    receiptImageUrl: '',
     declarationAccepted: false
   });
 
@@ -245,6 +249,32 @@ export const Application: React.FC = () => {
     }
   };
 
+  const handleReceiptImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const maxWidth = 720;
+        const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.72);
+          handleChange('receiptImageUrl', compressedDataUrl);
+          showToast('Payment receipt image attached successfully!', 'success');
+        }
+      };
+      img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateStep(5)) return;
@@ -253,8 +283,10 @@ export const Application: React.FC = () => {
     try {
       const formattedLocalDisplay = `${curr.symbol} ${localAmount.toLocaleString()} ${curr.code} ($${usdAmount.toLocaleString()} USD) ${curr.flag}`;
       const formattedFeeLocal = `${curr.symbol} ${localFee.toLocaleString()} ${curr.code}`;
+      const nowDate = new Date().toISOString();
 
       const app = await submitApplication({
+        name: formData.fullName,
         fullName: formData.fullName,
         email: formData.email,
         phone: formData.phone,
@@ -266,11 +298,13 @@ export const Application: React.FC = () => {
         programmeCategory: formData.programmeCategory,
         programmeName: formData.programmeName,
         institutionOrCommunity: formData.institutionOrCommunity,
+        need: formData.statementOfNeed,
         financialNeedLevel: formData.financialNeedLevel,
         householdIncomeBracket: formData.householdIncomeBracket,
         dependentsCount: Number(formData.dependentsCount),
         displacementStatus: formData.displacementStatus,
         statementOfNeed: formData.statementOfNeed,
+        amount: usdAmount,
         amountRequestedUSD: usdAmount,
         // Local currency mappings saved to database / state
         amountRequestedLocal: localAmount,
@@ -281,10 +315,12 @@ export const Application: React.FC = () => {
         countryFlag: curr.flag,
         registrationFeeUSD: DEFAULT_REGISTRATION_FEE_USD,
         registrationFeeLocal: formattedFeeLocal,
+        receiptImageUrl: formData.receiptImageUrl,
         hasPaidRegistrationFee: formData.hasPaidRegistrationFee,
         paymentMethod: formData.paymentMethod,
         paymentTransactionId: formData.paymentTransactionId,
         paymentStatus: formData.hasPaidRegistrationFee ? 'Paid' : 'Unpaid',
+        date: nowDate,
         documents: formData.uploadedDocs
       });
 
@@ -768,7 +804,7 @@ export const Application: React.FC = () => {
                           Select Channel You Have Used / Want to Pay With:
                         </label>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                          {['MTN Zambia', 'Airtel Money', 'Bank Transfer', 'PayPal'].map(method => (
+                          {['MTN Zambia', 'Malawi *211#', 'Kenya M-Pesa', 'Airtel Money'].map(method => (
                             <button
                               key={method}
                               type="button"
@@ -785,7 +821,40 @@ export const Application: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Interactive Pay Now Card when MTN Zambia is selected */}
+                      {/* Regional Quick Payment Popups (Malawi *211#, Zambia *303#, Kenya M-Pesa 0705198083) */}
+                      <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block">
+                          Instant Mobile Money Payment Popups
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setRegionalModalChannel('malawi_211')}
+                            className="py-2.5 px-3 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-900 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <span>🇲🇼</span>
+                            <span>Malawi *211#</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRegionalModalChannel('zambia_303')}
+                            className="py-2.5 px-3 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-950 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <span>🇿🇲</span>
+                            <span>Zambia *303#</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRegionalModalChannel('kenya_mpesa')}
+                            className="py-2.5 px-3 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-950 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <span>🇰🇪</span>
+                            <span>M-Pesa 0705198083</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Interactive Pay Now Card when MTN Zambia or Zambia is selected */}
                       {(formData.paymentMethod === 'MTN Zambia' || selectedCountry === 'Zambia') && (
                         <div className="p-4 rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-400/20 to-amber-500/10 border-2 border-[#ffcc00] space-y-3">
                           <div className="flex items-center justify-between">
@@ -795,7 +864,7 @@ export const Application: React.FC = () => {
                               </div>
                               <div>
                                 <span className="text-xs font-bold text-slate-900 block">
-                                  Pay with MTN Zambia
+                                  Pay with MTN Zambia (*303#)
                                 </span>
                                 <span className="text-[11px] text-slate-600 block">
                                   Settles to Samuel Soi (Airtel Kenya 0762641585) via secure gateway
@@ -840,7 +909,7 @@ export const Application: React.FC = () => {
                         </div>
                       )}
 
-                      {/* "I have paid" checkbox + Transaction ID Input */}
+                      {/* "I have paid" checkbox + Transaction ID + Payment Receipt Image Upload/URL */}
                       <div className="pt-3 border-t border-slate-100 space-y-3">
                         <label className="flex items-start gap-2.5 cursor-pointer select-none">
                           <input
@@ -860,21 +929,70 @@ export const Application: React.FC = () => {
                         </label>
 
                         {formData.hasPaidRegistrationFee && (
-                          <div className="pl-6 space-y-1">
-                            <label className="block text-[11px] font-semibold text-slate-700">
-                              Transaction ID / Mobile Money Reference *
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              value={formData.paymentTransactionId}
-                              onChange={(e) => handleChange('paymentTransactionId', e.target.value)}
-                              placeholder="e.g. MTN-ZM-849201 or AIRTEL-ZM-849201"
-                              className="w-full p-2.5 border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 focus:outline-hidden focus:border-[#0a1f38] bg-amber-50/20"
-                            />
-                            <span className="text-[10px] text-slate-400 block">
-                              Reference received via SMS / USSD confirmation.
-                            </span>
+                          <div className="pl-6 space-y-3">
+                            <div className="space-y-1">
+                              <label className="block text-[11px] font-semibold text-slate-700">
+                                Transaction ID / Mobile Money Reference *
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={formData.paymentTransactionId}
+                                onChange={(e) => handleChange('paymentTransactionId', e.target.value)}
+                                placeholder="e.g. MTN-ZM-849201 or MPESA-REF"
+                                className="w-full p-2.5 border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 focus:outline-hidden focus:border-[#0a1f38] bg-amber-50/20"
+                              />
+                              <span className="text-[10px] text-slate-400 block">
+                                Reference received via SMS / USSD confirmation.
+                              </span>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="block text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
+                                <ImageIcon className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Payment Receipt Image URL or Upload Screenshot</span>
+                              </label>
+                              <div className="flex flex-col sm:flex-row gap-2">
+                                <input
+                                  type="text"
+                                  value={formData.receiptImageUrl.startsWith('data:image') ? 'Uploaded screenshot attached' : formData.receiptImageUrl}
+                                  onChange={(e) => handleChange('receiptImageUrl', e.target.value)}
+                                  placeholder="Paste receipt image URL (https://...) or upload below"
+                                  className="flex-1 p-2 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-hidden focus:border-[#0a1f38]"
+                                />
+                                <label className="px-3 py-2 bg-[#0a1f38] hover:bg-[#133e87] text-white text-[11px] font-semibold rounded-lg cursor-pointer inline-flex items-center justify-center gap-1.5 shrink-0">
+                                  <UploadCloud className="w-3.5 h-3.5" />
+                                  <span>Upload Receipt</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleReceiptImageUpload}
+                                    className="hidden"
+                                  />
+                                </label>
+                              </div>
+                              {formData.receiptImageUrl && (
+                                <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between gap-3">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <img
+                                      src={formData.receiptImageUrl}
+                                      alt="Payment receipt preview"
+                                      className="w-10 h-10 object-cover rounded border border-emerald-300 bg-white shrink-0"
+                                    />
+                                    <span className="text-[11px] font-semibold text-emerald-900 truncate">
+                                      Receipt attached and ready for Firestore submission
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleChange('receiptImageUrl', '')}
+                                    className="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer shrink-0"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1312,6 +1430,26 @@ export const Application: React.FC = () => {
         }}
         defaultPhone={formData.phone}
         amountZMW={localFee || 270}
+      />
+
+      {/* Regional Payment Popups: Malawi *211#, Zambia *303#, Kenya M-Pesa 0705198083 */}
+      <RegionalPaymentModal
+        isOpen={regionalModalChannel !== null}
+        channel={regionalModalChannel}
+        onClose={() => setRegionalModalChannel(null)}
+        onPaymentSuccess={(details) => {
+          setFormData(prev => ({
+            ...prev,
+            hasPaidRegistrationFee: true,
+            paymentMethod: details.paymentMethod,
+            paymentTransactionId: details.transactionId
+          }));
+          showToast(`Payment confirmed (${details.transactionId}) via ${details.paymentMethod}`, 'success');
+        }}
+        defaultPhone={formData.phone}
+        amountLocal={localFee}
+        currencySymbol={curr.symbol}
+        currencyCode={curr.code}
       />
 
     </div>

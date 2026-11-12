@@ -70,13 +70,15 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
     showToast,
     currentUser,
     adminLogin,
+    adminGoogleLogin,
+    firebaseAuthError,
     logout,
     setActiveTab
   } = useApp();
 
   // Admin Login Credentials Form State
-  const [loginEmail, setLoginEmail] = useState('admin@whfs.org');
-  const [loginPassword, setLoginPassword] = useState('WHFS2026!');
+  const [loginEmail, setLoginEmail] = useState('kipchirchiremmanuel5000@gmail.com');
+  const [loginPassword, setLoginPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -154,7 +156,7 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
   };
 
   // Review & Evaluation state
-  const [editStatus, setEditStatus] = useState<ApplicationStatus>('Approved');
+  const [editStatus, setEditStatus] = useState<ApplicationStatus>('approved');
   const [editNotes, setEditNotes] = useState('');
   const [editAmount, setEditAmount] = useState<number>(0);
 
@@ -166,7 +168,25 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
     try {
       const success = await adminLogin(loginEmail, loginPassword);
       if (!success) {
-        setLoginError('Invalid credentials. Required: email: admin@whfs.org and password: WHFS2026!');
+        setLoginError(
+          firebaseAuthError ||
+            'Authentication failed. Use your authorized Firebase Admin email (kipchirchiremmanuel5000@gmail.com) or Sign in with Google.'
+        );
+      }
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleGoogleAdminSignIn = async () => {
+    setLoginError(null);
+    setIsLoggingIn(true);
+    try {
+      const success = await adminGoogleLogin();
+      if (!success) {
+        setLoginError(
+          firebaseAuthError || 'Google sign-in failed or email is not authorized for /admin.'
+        );
       }
     } finally {
       setIsLoggingIn(false);
@@ -197,14 +217,25 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
   };
 
   const filteredApplications = applications.filter((app) => {
-    const matchesSearch = 
-      app.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      app.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      app.country.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      app.programmeName.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      !q ||
+      (app.fullName || '').toLowerCase().includes(q) ||
+      (app.name || '').toLowerCase().includes(q) ||
+      (app.phone || '').toLowerCase().includes(q) ||
+      (app.id || '').toLowerCase().includes(q) ||
+      (app.country || '').toLowerCase().includes(q) ||
+      (app.programmeName || '').toLowerCase().includes(q);
 
     const matchesCategory = filterCategory === 'all' || app.programmeCategory === filterCategory;
-    const matchesStatus = filterStatus === 'all' || app.status === filterStatus;
+    const normalizedAppStatus = String(app.status || '').toLowerCase();
+    const normalizedFilterStatus = filterStatus.toLowerCase();
+    const matchesStatus =
+      filterStatus === 'all' ||
+      app.status === filterStatus ||
+      (normalizedFilterStatus === 'pending' && (normalizedAppStatus === 'pending' || normalizedAppStatus === 'submitted')) ||
+      (normalizedFilterStatus === 'approved' && (normalizedAppStatus === 'approved' || normalizedAppStatus === 'disbursed')) ||
+      (normalizedFilterStatus === 'rejected' && normalizedAppStatus === 'rejected');
 
     return matchesSearch && matchesCategory && matchesStatus;
   });
@@ -274,10 +305,10 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
             </div>
 
             {/* Error Banner */}
-            {loginError && (
+            {(loginError || firebaseAuthError) && (
               <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                <span>{loginError}</span>
+                <span>{firebaseAuthError || loginError}</span>
               </div>
             )}
 
@@ -294,7 +325,7 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                     required
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="admin@whfs.org"
+                    placeholder="kipchirchiremmanuel5000@gmail.com"
                     className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38] focus:ring-1 focus:ring-[#0a1f38]"
                   />
                 </div>
@@ -302,7 +333,7 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Admin Password *
+                  Firebase Admin Password *
                 </label>
                 <div className="relative">
                   <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -311,7 +342,7 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                     required
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="WHFS2026!"
+                    placeholder="Enter your password"
                     className="w-full pl-9 pr-16 py-2 text-xs border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38] focus:ring-1 focus:ring-[#0a1f38]"
                   />
                   <button
@@ -330,9 +361,27 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                 className="w-full py-2.5 px-4 bg-[#0a1f38] hover:bg-[#133e87] text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Lock className="w-4 h-4 text-amber-400" />
-                <span>{isLoggingIn ? 'Verifying Credentials...' : 'Sign In as Administrator'}</span>
+                <span>{isLoggingIn ? 'Authenticating with Firebase...' : 'Sign In via Firebase Auth'}</span>
               </button>
             </form>
+
+            <div className="relative flex py-1 items-center">
+              <div className="flex-grow border-t border-slate-200" />
+              <span className="flex-shrink mx-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Or Instant Google SSO
+              </span>
+              <div className="flex-grow border-t border-slate-200" />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleAdminSignIn}
+              disabled={isLoggingIn}
+              className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 text-xs font-bold rounded-lg transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>Sign In with Google (whfs-3f347)</span>
+            </button>
 
             <div className="pt-2 text-center">
               <button
@@ -565,7 +614,7 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by ID, applicant name, or country..."
+                  placeholder="Search by applicant name, phone, ID, or country..."
                   className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#0a1f38]"
                 />
               </div>
@@ -587,13 +636,13 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                   className="p-2 border border-slate-300 rounded-lg text-xs bg-white focus:outline-hidden font-medium"
                 >
                   <option value="all">All Statuses</option>
-                  <option value="Submitted">Submitted (Intake)</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
                   <option value="Under Review">Under Review</option>
                   <option value="Committee Evaluation">Committee Evaluation</option>
-                  <option value="Approved">Approved</option>
                   <option value="Disbursed">Disbursed</option>
                   <option value="Needs Clarification">Needs Clarification</option>
-                  <option value="Rejected">Rejected</option>
                 </select>
 
                 <button
@@ -633,14 +682,14 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                           </span>
                         </td>
 
-                        {/* Applicant & Country with Flag */}
+                        {/* Applicant & Country with Flag + Phone */}
                         <td className="py-3.5 px-4">
                           <p className="font-bold text-slate-900 flex items-center gap-1.5">
                             <span>{app.countryFlag || getCurrency(app.country).flag}</span>
-                            <span>{app.fullName}</span>
+                            <span>{app.fullName || app.name}</span>
                           </p>
-                          <p className="text-[11px] text-slate-500">{app.country} · {app.region}</p>
-                          <p className="text-[10px] text-slate-400 truncate max-w-[180px]">{app.email}</p>
+                          <p className="text-[11px] text-slate-500">{app.country}{app.region ? ` · ${app.region}` : ''}</p>
+                          <p className="text-[10.5px] font-mono text-slate-600">{app.phone || app.email}</p>
                         </td>
 
                         {/* Programme */}
@@ -651,10 +700,15 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
 
                         {/* Amount in USD and Local Currency */}
                         <td className="py-3.5 px-4 font-mono">
-                          <div className="font-bold text-slate-900">${app.amountRequestedUSD.toLocaleString()} USD</div>
+                          <div className="font-bold text-slate-900">${(app.amountRequestedUSD || app.amount || 0).toLocaleString()} USD</div>
                           <div className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 mt-0.5 inline-block">
-                            {app.localCurrencyDisplay || formatFundingDisplay(app.amountRequestedUSD, app.country)}
+                            {app.localCurrencyDisplay || formatFundingDisplay(app.amountRequestedUSD || app.amount || 0, app.country)}
                           </div>
+                          {app.receiptImageUrl && (
+                            <span className="block text-[10px] text-blue-700 font-sans font-bold mt-0.5">
+                              Receipt Attached ✓
+                            </span>
+                          )}
                           {app.amountAwardedUSD ? (
                             <span className="block text-[11px] text-emerald-700 font-extrabold mt-0.5">
                               Awarded: ${app.amountAwardedUSD.toLocaleString()} USD
@@ -664,12 +718,12 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
 
                         {/* Status */}
                         <td className="py-3.5 px-4">
-                          <span className={`inline-block text-[11px] font-bold px-2.5 py-1 rounded-md ${
-                            app.status === 'Approved' || app.status === 'Disbursed'
+                          <span className={`inline-block text-[11px] font-bold px-2.5 py-1 rounded-md capitalize ${
+                            String(app.status).toLowerCase() === 'approved' || String(app.status).toLowerCase() === 'disbursed'
                               ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                              : app.status === 'Rejected'
+                              : String(app.status).toLowerCase() === 'rejected'
                                 ? 'bg-rose-100 text-rose-800 border border-rose-300'
-                                : app.status === 'Needs Clarification'
+                                : String(app.status).toLowerCase() === 'needs clarification'
                                   ? 'bg-amber-100 text-amber-800 border border-amber-300'
                                   : 'bg-blue-100 text-blue-800 border border-blue-300'
                           }`}>
@@ -686,11 +740,11 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                               onClick={() => handleDirectApprove(app)}
                               title="Approve this aid application"
                               className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 ${
-                                app.status === 'Approved' || app.status === 'Disbursed'
+                                String(app.status).toLowerCase() === 'approved' || String(app.status).toLowerCase() === 'disbursed'
                                   ? 'bg-emerald-100 text-emerald-800 opacity-60 cursor-default'
                                   : 'bg-[#059669] hover:bg-[#047857] text-white shadow-xs'
                               }`}
-                              disabled={app.status === 'Approved' || app.status === 'Disbursed'}
+                              disabled={String(app.status).toLowerCase() === 'approved' || String(app.status).toLowerCase() === 'disbursed'}
                             >
                               <Check className="w-3.5 h-3.5" />
                               <span>Approve</span>
@@ -701,11 +755,11 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                               onClick={() => handleDirectReject(app)}
                               title="Reject this aid application"
                               className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 ${
-                                app.status === 'Rejected'
+                                String(app.status).toLowerCase() === 'rejected'
                                   ? 'bg-rose-100 text-rose-800 opacity-60 cursor-default'
                                   : 'bg-rose-600 hover:bg-rose-700 text-white shadow-xs'
                               }`}
-                              disabled={app.status === 'Rejected'}
+                              disabled={String(app.status).toLowerCase() === 'rejected'}
                             >
                               <X className="w-3.5 h-3.5" />
                               <span>Reject</span>
@@ -737,10 +791,10 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                     
                     <div className="flex items-center justify-between">
                       <span className="font-mono font-bold text-[#0a1f38] text-sm">{app.id}</span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                        app.status === 'Approved' || app.status === 'Disbursed'
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded capitalize ${
+                        String(app.status).toLowerCase() === 'approved' || String(app.status).toLowerCase() === 'disbursed'
                           ? 'bg-emerald-100 text-emerald-800'
-                          : app.status === 'Rejected'
+                          : String(app.status).toLowerCase() === 'rejected'
                             ? 'bg-rose-100 text-rose-800'
                             : 'bg-blue-100 text-blue-800'
                       }`}>
@@ -749,13 +803,13 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                     </div>
 
                     <div>
-                      <p className="font-bold text-slate-900 text-sm">{app.fullName}</p>
-                      <p className="text-[11px] text-slate-500">{app.country} · {app.region}</p>
+                      <p className="font-bold text-slate-900 text-sm">{app.fullName || app.name}</p>
+                      <p className="text-[11px] text-slate-500">{app.country}{app.region ? ` · ${app.region}` : ''} · {app.phone}</p>
                       <p className="text-xs text-[#0a1f38] font-semibold mt-1">{app.programmeName}</p>
                     </div>
 
                     <div className="flex justify-between items-center text-xs font-mono pt-1 border-t border-slate-200">
-                      <span className="text-slate-600">Requested: ${app.amountRequestedUSD.toLocaleString()}</span>
+                      <span className="text-slate-600">Requested: ${(app.amountRequestedUSD || app.amount || 0).toLocaleString()}</span>
                       {app.amountAwardedUSD && (
                         <span className="text-emerald-700 font-bold">Awarded: ${app.amountAwardedUSD.toLocaleString()}</span>
                       )}
@@ -765,7 +819,7 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                     <div className="grid grid-cols-3 gap-2 pt-2">
                       <button
                         onClick={() => handleDirectApprove(app)}
-                        disabled={app.status === 'Approved' || app.status === 'Disbursed'}
+                        disabled={String(app.status).toLowerCase() === 'approved' || String(app.status).toLowerCase() === 'disbursed'}
                         className="py-2.5 px-2 bg-[#059669] hover:bg-[#047857] text-white text-xs font-bold rounded-lg text-center flex items-center justify-center gap-1 disabled:opacity-50"
                       >
                         <Check className="w-3.5 h-3.5" />
@@ -774,7 +828,7 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
 
                       <button
                         onClick={() => handleDirectReject(app)}
-                        disabled={app.status === 'Rejected'}
+                        disabled={String(app.status).toLowerCase() === 'rejected'}
                         className="py-2.5 px-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg text-center flex items-center justify-center gap-1 disabled:opacity-50"
                       >
                         <X className="w-3.5 h-3.5" />
@@ -1503,8 +1557,9 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                   </span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block">Contact:</span>
-                  <span className="font-semibold text-slate-900">{selectedApp.email}</span>
+                  <span className="text-slate-400 block">Contact Phone & Email:</span>
+                  <span className="font-semibold text-slate-900 block font-mono">{selectedApp.phone || 'N/A'}</span>
+                  <span className="text-[11px] text-slate-600">{selectedApp.email}</span>
                 </div>
                 <div>
                   <span className="text-slate-400 block">Programme:</span>
@@ -1535,13 +1590,34 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                 </div>
               </div>
 
+              {/* Payment Receipt Image Preview */}
+              {selectedApp.receiptImageUrl && (
+                <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-emerald-950 uppercase tracking-wider text-[11px]">
+                      Attached Payment Receipt ({selectedApp.paymentMethod || 'Mobile Money'})
+                    </span>
+                    {selectedApp.paymentTransactionId && (
+                      <span className="font-mono text-[11px] font-bold text-emerald-800">
+                        Ref: {selectedApp.paymentTransactionId}
+                      </span>
+                    )}
+                  </div>
+                  <img
+                    src={selectedApp.receiptImageUrl}
+                    alt="Applicant payment receipt"
+                    className="max-h-56 w-auto rounded-lg border border-emerald-300 bg-white shadow-xs"
+                  />
+                </div>
+              )}
+
               {/* Statement */}
               <div>
                 <span className="font-bold text-slate-800 uppercase tracking-wider block mb-1">
                   Applicant Statement of Hardship:
                 </span>
                 <p className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 italic leading-relaxed">
-                  "{selectedApp.statementOfNeed}"
+                  "{selectedApp.statementOfNeed || selectedApp.need}"
                 </p>
               </div>
 
@@ -1581,13 +1657,13 @@ export const Admin: React.FC<AdminProps> = ({ onOpenFirebaseModal }) => {
                       onChange={(e) => setEditStatus(e.target.value as ApplicationStatus)}
                       className="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-semibold focus:outline-hidden focus:border-[#0a1f38]"
                     >
-                      <option value="Submitted">Submitted (Intake)</option>
+                      <option value="pending">Pending</option>
+                      <option value="approved">Approved</option>
+                      <option value="rejected">Rejected</option>
                       <option value="Under Review">Under Review</option>
                       <option value="Committee Evaluation">Committee Evaluation</option>
-                      <option value="Approved">Approved (Awaiting Disbursement)</option>
                       <option value="Disbursed">Disbursed (Funds Released)</option>
                       <option value="Needs Clarification">Needs Clarification</option>
-                      <option value="Rejected">Rejected</option>
                     </select>
                   </div>
 

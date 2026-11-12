@@ -1,0 +1,473 @@
+{
+  "entities": {
+    "Application": {
+      "title": "Humanitarian Grant Application",
+      "description": "Worldwide humanitarian and educational support application submitted via the WHFS portal.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128,
+          "description": "Unique tracking reference ID"
+        },
+        "userId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "fullName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "dateOfBirth": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "gender": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "country": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "countryFlag": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "region": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "programmeCategory": {
+          "type": "string",
+          "enum": ["education", "humanitarian"],
+          "maxLength": 32
+        },
+        "programmeName": {
+          "type": "string",
+          "maxLength": 250
+        },
+        "institutionOrCommunity": {
+          "type": "string",
+          "maxLength": 250
+        },
+        "need": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "financialNeedLevel": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "householdIncomeBracket": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "dependentsCount": {
+          "type": "number"
+        },
+        "displacementStatus": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "statementOfNeed": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "amount": {
+          "type": "number"
+        },
+        "amountRequestedUSD": {
+          "type": "number"
+        },
+        "amountRequestedLocal": {
+          "type": "number"
+        },
+        "localCurrencyCode": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "localCurrencySymbol": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "localCurrencyRate": {
+          "type": "number"
+        },
+        "localCurrencyDisplay": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "amountAwardedUSD": {
+          "type": "number"
+        },
+        "registrationFeeUSD": {
+          "type": "number"
+        },
+        "registrationFeeLocal": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "receiptImageUrl": {
+          "type": "string",
+          "maxLength": 250000
+        },
+        "hasPaidRegistrationFee": {
+          "type": "boolean"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "paymentTransactionId": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "paymentStatus": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "paymentDate": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "approved",
+            "rejected",
+            "Submitted",
+            "Under Review",
+            "Committee Evaluation",
+            "Approved",
+            "Disbursed",
+            "Needs Clarification",
+            "Rejected"
+          ],
+          "maxLength": 40
+        },
+        "committeeNotes": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "date": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "updatedAt": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "documents": {
+          "type": "array"
+        },
+        "timeline": {
+          "type": "array"
+        }
+      },
+      "required": ["id", "name", "phone", "country", "need", "amount", "status", "date"]
+    },
+    "ApplicationStatusPublic": {
+      "title": "Public Application Tracking Status",
+      "description": "PII-free tracking status record used for live application status lookup.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "country": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "countryFlag": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "programmeCategory": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "programmeName": {
+          "type": "string",
+          "maxLength": 250
+        },
+        "amountRequestedUSD": {
+          "type": "number"
+        },
+        "localCurrencyDisplay": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "amountAwardedUSD": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "committeeNotes": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "date": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "updatedAt": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "timeline": {
+          "type": "array"
+        }
+      },
+      "required": ["id", "country", "status", "date"]
+    },
+    "RegistrationFeePayment": {
+      "title": "Registration Fee Payment",
+      "description": "Recorded registration fee transaction linked to an intake application.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "applicationId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "applicantName": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "applicantEmail": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "country": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "countryFlag": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "amountUSD": {
+          "type": "number"
+        },
+        "amountLocal": {
+          "type": "number"
+        },
+        "currencyCode": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "currencySymbol": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "paymentMethod": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "transactionReference": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "receiptImageUrl": {
+          "type": "string",
+          "maxLength": 250000
+        },
+        "date": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "status": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        }
+      },
+      "required": ["id", "applicationId", "applicantName", "country", "amountUSD", "status", "date"]
+    },
+    "DonationRecord": {
+      "title": "Donation Record",
+      "description": "Philanthropic contribution logged in WHFS donation ledger.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "donorName": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "donorEmail": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "amount": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "frequency": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "cause": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "date": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "receiptNumber": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "isAnonymous": {
+          "type": "boolean"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "maxLength": 100
+        }
+      },
+      "required": ["id", "donorName", "amount", "currency", "date"]
+    },
+    "WithdrawalRecord": {
+      "title": "Treasury Withdrawal Record",
+      "description": "Admin treasury withdrawal dispatched to Airtel Kenya 0762641585.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 128
+        },
+        "amountUSD": {
+          "type": "number"
+        },
+        "amountZMW": {
+          "type": "number"
+        },
+        "method": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "destinationAccount": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "recipientName": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "requestedBy": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "date": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "status": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "referenceCode": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        }
+      },
+      "required": ["id", "amountUSD", "method", "destinationAccount", "status", "date"]
+    },
+    "PayoutSettings": {
+      "title": "Treasury Payout Account Settings",
+      "description": "Single source of truth receiving account for WHFS treasury.",
+      "type": "object",
+      "properties": {
+        "airtelKenyaNumber": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "airtelKenyaAccountName": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "updatedAt": {
+          "type": "string",
+          "maxLength": 64
+        }
+      },
+      "required": ["airtelKenyaNumber", "airtelKenyaAccountName", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/applications/{applicationId}": {
+      "schema": { "$ref": "#/entities/Application" },
+      "description": "All grant applications submitted via the Apply form, readable and manageable by Admin in real-time."
+    },
+    "/application_status/{applicationId}": {
+      "schema": { "$ref": "#/entities/ApplicationStatusPublic" },
+      "description": "Public PII-free application status lookup mirror for applicant tracking."
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/RegistrationFeePayment" },
+      "description": "Registration fee payment records created during application intake."
+    },
+    "/donations/{donationId}": {
+      "schema": { "$ref": "#/entities/DonationRecord" },
+      "description": "Philanthropic donations submitted via the Donate portal."
+    },
+    "/withdrawals/{withdrawalId}": {
+      "schema": { "$ref": "#/entities/WithdrawalRecord" },
+      "description": "Admin treasury withdrawal records."
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/PayoutSettings" },
+      "description": "Admin treasury payout settings document."
+    }
+  }
+}

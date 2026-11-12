@@ -128,7 +128,7 @@ export const MTNPaymentModal: React.FC<MTNPaymentModalProps> = ({
               {/* Phone Input */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-slate-800">
-                  MTN Mobile Money Number *
+                  Zambia Mobile Money Number (*303# / MTN) *
                 </label>
                 <div className="relative">
                   <Smartphone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
@@ -142,7 +142,7 @@ export const MTNPaymentModal: React.FC<MTNPaymentModalProps> = ({
                   />
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  Enter your Zambian MTN line that will receive the USSD authorization prompt.
+                  Dial <strong className="font-mono text-slate-800">*303#</strong> on MTN/Airtel Zambia or enter your Zambian line below for an instant USSD push.
                 </p>
               </div>
 
@@ -160,7 +160,7 @@ export const MTNPaymentModal: React.FC<MTNPaymentModalProps> = ({
                 <div className="flex items-start gap-2">
                   <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                   <p>
-                    You will receive a prompt on your MTN phone - Enter PIN to confirm. Money goes to Admin Airtel Kenya 0762641585 via secure gateway.
+                    You will receive a *303# / MTN USSD prompt on your phone - Enter PIN to confirm. Money goes to Admin Airtel Kenya 0762641585 via secure gateway.
                   </p>
                 </div>
               </div>

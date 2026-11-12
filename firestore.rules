@@ -1,0 +1,287 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Default-Deny Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reusable Security Primitives
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (
+          request.auth.token.email == 'kipchirchiremmanuel5000@gmail.com' &&
+          (
+            request.auth.token.email_verified == true ||
+            request.auth.token.firebase.sign_in_provider == 'password'
+          )
+        )
+      );
+    }
+
+    function isValidApplication(data) {
+      return data.keys().hasAll(['id', 'name', 'phone', 'country', 'need', 'amount', 'status', 'date'])
+        && data.keys().hasOnly([
+          'id', 'userId', 'name', 'fullName', 'email', 'phone', 'dateOfBirth', 'gender',
+          'country', 'countryFlag', 'region', 'address', 'programmeCategory', 'programmeName',
+          'institutionOrCommunity', 'need', 'financialNeedLevel', 'householdIncomeBracket',
+          'dependentsCount', 'displacementStatus', 'statementOfNeed', 'amount',
+          'amountRequestedUSD', 'amountRequestedLocal', 'localCurrencyCode',
+          'localCurrencySymbol', 'localCurrencyRate', 'localCurrencyDisplay',
+          'amountAwardedUSD', 'registrationFeeUSD', 'registrationFeeLocal',
+          'receiptImageUrl', 'hasPaidRegistrationFee', 'paymentMethod',
+          'paymentTransactionId', 'paymentStatus', 'paymentDate', 'status',
+          'committeeNotes', 'date', 'createdAt', 'updatedAt', 'disbursementDate',
+          'documents', 'timeline'
+        ])
+        && data.id is string && data.id.size() >= 3 && data.id.size() <= 128
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 200
+        && data.phone is string && data.phone.size() <= 64
+        && data.country is string && data.country.size() >= 1 && data.country.size() <= 120
+        && data.need is string && data.need.size() <= 4000
+        && data.amount is number && data.amount >= 0 && data.amount <= 100000000
+        && data.status is string && data.status.size() >= 1 && data.status.size() <= 40
+        && data.status in ['pending', 'approved', 'rejected', 'Submitted', 'Under Review', 'Committee Evaluation', 'Approved', 'Disbursed', 'Needs Clarification', 'Rejected']
+        && data.date is string && data.date.size() <= 64
+        && (!('userId' in data) || (data.userId is string && data.userId.size() <= 128))
+        && (!('fullName' in data) || (data.fullName is string && data.fullName.size() <= 200))
+        && (!('email' in data) || (data.email is string && data.email.size() <= 200))
+        && (!('dateOfBirth' in data) || (data.dateOfBirth is string && data.dateOfBirth.size() <= 32))
+        && (!('gender' in data) || (data.gender is string && data.gender.size() <= 64))
+        && (!('countryFlag' in data) || (data.countryFlag is string && data.countryFlag.size() <= 16))
+        && (!('region' in data) || (data.region is string && data.region.size() <= 120))
+        && (!('address' in data) || (data.address is string && data.address.size() <= 400))
+        && (!('programmeCategory' in data) || (data.programmeCategory is string && data.programmeCategory.size() <= 32))
+        && (!('programmeName' in data) || (data.programmeName is string && data.programmeName.size() <= 250))
+        && (!('institutionOrCommunity' in data) || (data.institutionOrCommunity is string && data.institutionOrCommunity.size() <= 250))
+        && (!('financialNeedLevel' in data) || (data.financialNeedLevel is string && data.financialNeedLevel.size() <= 100))
+        && (!('householdIncomeBracket' in data) || (data.householdIncomeBracket is string && data.householdIncomeBracket.size() <= 100))
+        && (!('dependentsCount' in data) || (data.dependentsCount is number && data.dependentsCount >= 0 && data.dependentsCount <= 100))
+        && (!('displacementStatus' in data) || (data.displacementStatus is string && data.displacementStatus.size() <= 100))
+        && (!('statementOfNeed' in data) || (data.statementOfNeed is string && data.statementOfNeed.size() <= 4000))
+        && (!('amountRequestedUSD' in data) || (data.amountRequestedUSD is number && data.amountRequestedUSD >= 0))
+        && (!('amountRequestedLocal' in data) || (data.amountRequestedLocal is number && data.amountRequestedLocal >= 0))
+        && (!('localCurrencyCode' in data) || (data.localCurrencyCode is string && data.localCurrencyCode.size() <= 16))
+        && (!('localCurrencySymbol' in data) || (data.localCurrencySymbol is string && data.localCurrencySymbol.size() <= 16))
+        && (!('localCurrencyRate' in data) || (data.localCurrencyRate is number && data.localCurrencyRate >= 0))
+        && (!('localCurrencyDisplay' in data) || (data.localCurrencyDisplay is string && data.localCurrencyDisplay.size() <= 150))
+        && (!('amountAwardedUSD' in data) || (data.amountAwardedUSD is number && data.amountAwardedUSD >= 0))
+        && (!('registrationFeeUSD' in data) || (data.registrationFeeUSD is number && data.registrationFeeUSD >= 0))
+        && (!('registrationFeeLocal' in data) || (data.registrationFeeLocal is string && data.registrationFeeLocal.size() <= 100))
+        && (!('receiptImageUrl' in data) || (data.receiptImageUrl is string && data.receiptImageUrl.size() <= 350000))
+        && (!('hasPaidRegistrationFee' in data) || data.hasPaidRegistrationFee is bool)
+        && (!('paymentMethod' in data) || (data.paymentMethod is string && data.paymentMethod.size() <= 100))
+        && (!('paymentTransactionId' in data) || (data.paymentTransactionId is string && data.paymentTransactionId.size() <= 120))
+        && (!('paymentStatus' in data) || (data.paymentStatus is string && data.paymentStatus.size() <= 64))
+        && (!('paymentDate' in data) || (data.paymentDate is string && data.paymentDate.size() <= 40))
+        && (!('committeeNotes' in data) || (data.committeeNotes is string && data.committeeNotes.size() <= 2000))
+        && (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64))
+        && (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64))
+        && (!('disbursementDate' in data) || (data.disbursementDate is string && data.disbursementDate.size() <= 64))
+        && (!('documents' in data) || (data.documents is list && data.documents.size() <= 20 && (data.documents.size() == 0 || data.documents[0] is map)))
+        && (!('timeline' in data) || (data.timeline is list && data.timeline.size() <= 50 && (data.timeline.size() == 0 || data.timeline[0] is map)));
+    }
+
+    function isValidApplicationStatusPublic(data) {
+      return data.keys().hasAll(['id', 'country', 'status', 'date'])
+        && data.keys().hasOnly([
+          'id', 'country', 'countryFlag', 'programmeCategory', 'programmeName',
+          'amountRequestedUSD', 'localCurrencyDisplay', 'amountAwardedUSD',
+          'status', 'committeeNotes', 'date', 'updatedAt', 'timeline'
+        ])
+        && data.id is string && data.id.size() >= 3 && data.id.size() <= 128
+        && data.country is string && data.country.size() >= 1 && data.country.size() <= 120
+        && data.status is string && data.status.size() <= 40
+        && data.date is string && data.date.size() <= 64
+        && (!('countryFlag' in data) || (data.countryFlag is string && data.countryFlag.size() <= 16))
+        && (!('programmeCategory' in data) || (data.programmeCategory is string && data.programmeCategory.size() <= 32))
+        && (!('programmeName' in data) || (data.programmeName is string && data.programmeName.size() <= 250))
+        && (!('amountRequestedUSD' in data) || (data.amountRequestedUSD is number && data.amountRequestedUSD >= 0))
+        && (!('localCurrencyDisplay' in data) || (data.localCurrencyDisplay is string && data.localCurrencyDisplay.size() <= 150))
+        && (!('amountAwardedUSD' in data) || (data.amountAwardedUSD is number && data.amountAwardedUSD >= 0))
+        && (!('committeeNotes' in data) || (data.committeeNotes is string && data.committeeNotes.size() <= 2000))
+        && (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64))
+        && (!('timeline' in data) || (data.timeline is list && data.timeline.size() <= 50 && (data.timeline.size() == 0 || data.timeline[0] is map)));
+    }
+
+    function isValidPayment(data) {
+      return data.keys().hasAll(['id', 'applicationId', 'applicantName', 'country', 'amountUSD', 'status', 'date'])
+        && data.keys().hasOnly([
+          'id', 'applicationId', 'applicantName', 'applicantEmail', 'country',
+          'countryFlag', 'amountUSD', 'amountLocal', 'currencyCode', 'currencySymbol',
+          'paymentMethod', 'transactionReference', 'receiptImageUrl', 'date', 'status', 'notes'
+        ])
+        && data.id is string && data.id.size() <= 128
+        && data.applicationId is string && data.applicationId.size() <= 128
+        && data.applicantName is string && data.applicantName.size() <= 200
+        && data.country is string && data.country.size() <= 120
+        && data.amountUSD is number && data.amountUSD >= 0
+        && data.status is string && data.status.size() <= 40
+        && data.date is string && data.date.size() <= 64
+        && (!('applicantEmail' in data) || (data.applicantEmail is string && data.applicantEmail.size() <= 200))
+        && (!('countryFlag' in data) || (data.countryFlag is string && data.countryFlag.size() <= 16))
+        && (!('amountLocal' in data) || (data.amountLocal is number && data.amountLocal >= 0))
+        && (!('currencyCode' in data) || (data.currencyCode is string && data.currencyCode.size() <= 16))
+        && (!('currencySymbol' in data) || (data.currencySymbol is string && data.currencySymbol.size() <= 16))
+        && (!('paymentMethod' in data) || (data.paymentMethod is string && data.paymentMethod.size() <= 100))
+        && (!('transactionReference' in data) || (data.transactionReference is string && data.transactionReference.size() <= 120))
+        && (!('receiptImageUrl' in data) || (data.receiptImageUrl is string && data.receiptImageUrl.size() <= 350000))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 500));
+    }
+
+    function isValidDonation(data) {
+      return data.keys().hasAll(['id', 'donorName', 'amount', 'currency', 'date'])
+        && data.keys().hasOnly([
+          'id', 'donorName', 'donorEmail', 'amount', 'currency', 'frequency',
+          'cause', 'date', 'receiptNumber', 'isAnonymous', 'paymentMethod'
+        ])
+        && data.id is string && data.id.size() <= 128
+        && data.donorName is string && data.donorName.size() <= 200
+        && data.amount is number && data.amount > 0
+        && data.currency is string && data.currency.size() <= 16
+        && data.date is string && data.date.size() <= 64
+        && (!('donorEmail' in data) || (data.donorEmail is string && data.donorEmail.size() <= 200))
+        && (!('frequency' in data) || (data.frequency is string && data.frequency.size() <= 32))
+        && (!('cause' in data) || (data.cause is string && data.cause.size() <= 200))
+        && (!('receiptNumber' in data) || (data.receiptNumber is string && data.receiptNumber.size() <= 64))
+        && (!('isAnonymous' in data) || data.isAnonymous is bool)
+        && (!('paymentMethod' in data) || (data.paymentMethod is string && data.paymentMethod.size() <= 100));
+    }
+
+    function isValidWithdrawal(data) {
+      return data.keys().hasAll(['id', 'amountUSD', 'method', 'destinationAccount', 'status', 'date'])
+        && data.keys().hasOnly([
+          'id', 'amountUSD', 'amountZMW', 'method', 'destinationAccount',
+          'recipientName', 'requestedBy', 'date', 'status', 'referenceCode', 'notes'
+        ])
+        && data.id is string && data.id.size() <= 128
+        && data.amountUSD is number && data.amountUSD > 0
+        && data.method is string && data.method.size() <= 64
+        && data.destinationAccount is string && data.destinationAccount.size() <= 200
+        && data.status is string && data.status.size() <= 40
+        && data.date is string && data.date.size() <= 64
+        && (!('amountZMW' in data) || (data.amountZMW is number && data.amountZMW >= 0))
+        && (!('recipientName' in data) || (data.recipientName is string && data.recipientName.size() <= 200))
+        && (!('requestedBy' in data) || (data.requestedBy is string && data.requestedBy.size() <= 200))
+        && (!('referenceCode' in data) || (data.referenceCode is string && data.referenceCode.size() <= 120))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 500));
+    }
+
+    function isValidPayoutSettings(data) {
+      return data.keys().hasAll(['airtelKenyaNumber', 'airtelKenyaAccountName', 'updatedAt'])
+        && data.keys().hasOnly(['airtelKenyaNumber', 'airtelKenyaAccountName', 'updatedAt'])
+        && data.airtelKenyaNumber is string && data.airtelKenyaNumber.size() >= 5 && data.airtelKenyaNumber.size() <= 40
+        && data.airtelKenyaAccountName is string && data.airtelKenyaAccountName.size() >= 1 && data.airtelKenyaAccountName.size() <= 200
+        && data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    // 1. Primary Applications Collection
+    match /applications/{applicationId} {
+      allow get: if isValidId(applicationId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isValidId(applicationId)
+        && isValidApplication(incoming())
+        && incoming().id == applicationId
+        && incoming().status == 'pending';
+      allow update: if isValidId(applicationId)
+        && isAdmin()
+        && isValidApplication(incoming())
+        && incoming().id == existing().id
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'status', 'committeeNotes', 'amountAwardedUSD', 'updatedAt', 'timeline', 'disbursementDate', 'paymentStatus'
+        ]);
+      allow delete: if isValidId(applicationId) && isAdmin();
+    }
+
+    // 2. PII-Free Public Status Lookup Collection
+    match /application_status/{applicationId} {
+      allow get: if isValidId(applicationId);
+      allow list: if isAdmin();
+      allow create: if isValidId(applicationId)
+        && isValidApplicationStatusPublic(incoming())
+        && incoming().id == applicationId
+        && incoming().status == 'pending';
+      allow update: if isValidId(applicationId)
+        && isAdmin()
+        && isValidApplicationStatusPublic(incoming())
+        && incoming().id == existing().id
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'status', 'committeeNotes', 'amountAwardedUSD', 'updatedAt', 'timeline'
+        ]);
+      allow delete: if isValidId(applicationId) && isAdmin();
+    }
+
+    // 3. Registration Fee Payments Collection
+    match /payments/{paymentId} {
+      allow get: if isValidId(paymentId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(paymentId)
+        && isValidPayment(incoming())
+        && incoming().id == paymentId;
+      allow update: if isValidId(paymentId)
+        && isAdmin()
+        && isValidPayment(incoming())
+        && incoming().id == existing().id
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'notes']);
+      allow delete: if isValidId(paymentId) && isAdmin();
+    }
+
+    // 4. Donations Collection
+    match /donations/{donationId} {
+      allow get: if isValidId(donationId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(donationId)
+        && isValidDonation(incoming())
+        && incoming().id == donationId;
+      allow update, delete: if isValidId(donationId) && isAdmin();
+    }
+
+    // 5. Treasury Withdrawals Collection
+    match /withdrawals/{withdrawalId} {
+      allow get: if isValidId(withdrawalId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(withdrawalId)
+        && isAdmin()
+        && isValidWithdrawal(incoming())
+        && incoming().id == withdrawalId;
+      allow update: if isValidId(withdrawalId)
+        && isAdmin()
+        && isValidWithdrawal(incoming())
+        && incoming().id == existing().id
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'notes']);
+      allow delete: if isValidId(withdrawalId) && isAdmin();
+    }
+
+    // 6. Treasury Payout Settings Collection
+    match /settings/{settingId} {
+      allow get: if settingId == 'payout';
+      allow list: if isAdmin();
+      allow create, update: if isValidId(settingId) && isAdmin() && isValidPayoutSettings(incoming());
+      allow delete: if isValidId(settingId) && isAdmin();
+    }
+
+    // 7. Admins Allowlist Collection
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && isSignedIn() && request.auth.uid == adminId;
+      allow list, create, update, delete: if false;
+    }
+  }
+}

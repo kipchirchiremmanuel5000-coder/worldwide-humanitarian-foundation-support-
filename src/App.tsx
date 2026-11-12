@@ -24,12 +24,12 @@ import { DonationPage } from './pages/DonationPage';
 import { ContactPage } from './pages/ContactPage';
 import { Admin } from './pages/Admin';
 
-// Protected Route Guard for /admin: Only allows admin@whfs.org, authorized admin email, or role === 'admin'
+// Protected Route Guard for /admin: Redirects signed-in non-admin applicants to "/"; renders Firebase Auth Admin login gate when unauthenticated
 const ProtectedAdminRoute: React.FC<{ onOpenFirebaseModal: () => void }> = ({ onOpenFirebaseModal }) => {
-  const { currentUser } = useApp();
+  const { currentUser, authReady } = useApp();
   const isAdmin = currentUser?.email === 'admin@whfs.org' || currentUser?.email === 'kipchirchiremmanuel5000@gmail.com' || currentUser?.role === 'admin';
 
-  if (!isAdmin) {
+  if (authReady && currentUser && !isAdmin) {
     return <Navigate to="/" replace />;
   }
 
@@ -37,17 +37,17 @@ const ProtectedAdminRoute: React.FC<{ onOpenFirebaseModal: () => void }> = ({ on
 };
 
 const AppRoutes: React.FC<{ onOpenFirebaseModal: () => void }> = ({ onOpenFirebaseModal }) => {
-  const { activeTab, setActiveTab, currentUser } = useApp();
+  const { activeTab, setActiveTab, currentUser, authReady } = useApp();
   const location = useLocation();
   const navigate = useNavigate();
 
   const isAdmin = currentUser?.email === 'admin@whfs.org' || currentUser?.email === 'kipchirchiremmanuel5000@gmail.com' || currentUser?.role === 'admin';
 
-  // Sync browser URL to AppContext activeTab and intercept unauthorized /admin navigation
+  // Sync browser URL to AppContext activeTab and intercept unauthorized signed-in applicant /admin navigation
   useEffect(() => {
     const rawPath = location.pathname.replace(/^\//, '').split('/')[0];
     const currentRoute = rawPath || 'home';
-    if (currentRoute === 'admin' && !isAdmin) {
+    if (currentRoute === 'admin' && authReady && currentUser && !isAdmin) {
       navigate('/', { replace: true });
       setActiveTab('home');
       return;
@@ -55,11 +55,11 @@ const AppRoutes: React.FC<{ onOpenFirebaseModal: () => void }> = ({ onOpenFireba
     if (currentRoute !== activeTab) {
       setActiveTab(currentRoute);
     }
-  }, [location.pathname, isAdmin]);
+  }, [location.pathname, isAdmin, authReady, currentUser]);
 
   // Sync AppContext activeTab changes to browser URL
   useEffect(() => {
-    if (activeTab === 'admin' && !isAdmin) {
+    if (activeTab === 'admin' && authReady && currentUser && !isAdmin) {
       setActiveTab('home');
       return;
     }
@@ -67,7 +67,7 @@ const AppRoutes: React.FC<{ onOpenFirebaseModal: () => void }> = ({ onOpenFireba
     if (location.pathname !== targetUrl) {
       navigate(targetUrl);
     }
-  }, [activeTab, isAdmin]);
+  }, [activeTab, isAdmin, authReady, currentUser]);
 
   return (
     <Routes>

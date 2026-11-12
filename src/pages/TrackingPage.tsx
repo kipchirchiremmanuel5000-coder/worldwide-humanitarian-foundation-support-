@@ -20,10 +20,10 @@ import { HumanitarianApplication, ApplicationStatus } from '../types';
 export const TrackingPage: React.FC = () => {
   const { 
     applications, 
-    currentUser, 
     selectedTrackingId, 
     setSelectedTrackingId, 
     setActiveTab,
+    lookupApplicationById,
     showToast 
   } = useApp();
 
@@ -38,14 +38,17 @@ export const TrackingPage: React.FC = () => {
       const found = applications.find(a => a.id.toLowerCase() === selectedTrackingId.toLowerCase());
       if (found) {
         setActiveApp(found);
+      } else {
+        lookupApplicationById(selectedTrackingId).then((res) => {
+          if (res) setActiveApp(res);
+        });
       }
     } else if (applications.length > 0) {
-      // Default to first application for instant preview
       setActiveApp(applications[0]);
     }
   }, [selectedTrackingId, applications]);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     const query = searchQuery.trim().toUpperCase();
     if (!query) {
@@ -53,25 +56,37 @@ export const TrackingPage: React.FC = () => {
       return;
     }
 
-    const match = applications.find(a => a.id.toUpperCase() === query || a.fullName.toLowerCase().includes(query.toLowerCase()));
-    if (match) {
-      setActiveApp(match);
-      setSelectedTrackingId(match.id);
-      showToast(`Loaded application: ${match.id}`, 'success');
+    const localMatch = applications.find(
+      a => a.id.toUpperCase() === query || (a.fullName || '').toLowerCase().includes(query.toLowerCase())
+    );
+    if (localMatch) {
+      setActiveApp(localMatch);
+      setSelectedTrackingId(localMatch.id);
+      showToast(`Loaded application: ${localMatch.id}`, 'success');
+      return;
+    }
+
+    const remoteMatch = await lookupApplicationById(query);
+    if (remoteMatch) {
+      setActiveApp(remoteMatch);
+      setSelectedTrackingId(remoteMatch.id);
+      showToast(`Loaded application from Firestore: ${remoteMatch.id}`, 'success');
     } else {
       showToast(`No application found for "${query}"`, 'error');
     }
   };
 
   const getStageNumber = (status: ApplicationStatus): number => {
-    switch (status) {
-      case 'Submitted': return 1;
-      case 'Under Review':
-      case 'Needs Clarification': return 2;
-      case 'Committee Evaluation': return 3;
-      case 'Approved':
-      case 'Disbursed': return 4;
-      case 'Rejected': return 4;
+    const s = String(status).toLowerCase();
+    switch (s) {
+      case 'pending':
+      case 'submitted': return 1;
+      case 'under review':
+      case 'needs clarification': return 2;
+      case 'committee evaluation': return 3;
+      case 'approved':
+      case 'disbursed':
+      case 'rejected': return 4;
       default: return 1;
     }
   };
@@ -164,12 +179,12 @@ export const TrackingPage: React.FC = () => {
                     <span className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold block">
                       Current Decision Status
                     </span>
-                    <span className={`inline-block mt-1 text-xs font-bold px-3 py-1 rounded-md ${
-                      activeApp.status === 'Approved' || activeApp.status === 'Disbursed'
+                    <span className={`inline-block mt-1 text-xs font-bold px-3 py-1 rounded-md capitalize ${
+                      String(activeApp.status).toLowerCase() === 'approved' || String(activeApp.status).toLowerCase() === 'disbursed'
                         ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                        : activeApp.status === 'Rejected'
+                        : String(activeApp.status).toLowerCase() === 'rejected'
                           ? 'bg-rose-100 text-rose-900 border border-rose-300'
-                          : activeApp.status === 'Needs Clarification'
+                          : String(activeApp.status).toLowerCase() === 'needs clarification'
                             ? 'bg-amber-100 text-amber-900 border border-amber-300'
                             : 'bg-blue-100 text-blue-900 border border-blue-300'
                     }`}>
@@ -255,7 +270,7 @@ export const TrackingPage: React.FC = () => {
                   {/* Stage 4: Disbursement */}
                   <div className={`p-4 rounded-xl border transition-all ${
                     currentStage >= 4 
-                      ? activeApp.status === 'Rejected' 
+                      ? String(activeApp.status).toLowerCase() === 'rejected' 
                         ? 'bg-rose-50 border-rose-300 text-rose-950' 
                         : 'bg-emerald-50/60 border-emerald-300 text-emerald-950' 
                       : 'bg-slate-50 border-slate-200 text-slate-400'
@@ -263,7 +278,7 @@ export const TrackingPage: React.FC = () => {
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-bold">Stage 4</span>
                       {currentStage >= 4 && (
-                        activeApp.status === 'Rejected' ? (
+                        String(activeApp.status).toLowerCase() === 'rejected' ? (
                           <AlertCircle className="w-4 h-4 text-rose-600" />
                         ) : (
                           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -271,7 +286,7 @@ export const TrackingPage: React.FC = () => {
                       )}
                     </div>
                     <h4 className="text-sm font-bold">
-                      {activeApp.status === 'Disbursed' ? 'Funds Disbursed' : 'Award Decision'}
+                      {String(activeApp.status).toLowerCase() === 'disbursed' ? 'Funds Disbursed' : 'Award Decision'}
                     </h4>
                     <p className="text-[11px] text-slate-500 mt-1">
                       Official grant release to institution.

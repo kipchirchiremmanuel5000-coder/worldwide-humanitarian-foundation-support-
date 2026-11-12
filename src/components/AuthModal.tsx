@@ -25,8 +25,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     setIsLoading(true);
 
     try {
+      const normalized = email.trim().toLowerCase();
       if (mode === 'signin') {
-        if (role === 'admin' || email.trim().toLowerCase() === 'admin@whfs.org') {
+        if (role === 'admin' || normalized === 'admin@whfs.org' || normalized === 'kipchirchiremmanuel5000@gmail.com') {
           const success = await adminLogin(email, password);
           if (success) {
             setActiveTab('admin');
@@ -34,12 +35,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           }
           return;
         } else {
-          await login(email, role);
+          const success = await login(email, password);
+          if (success) onClose();
         }
       } else {
-        await register(name, email, country, role);
+        const success = await register(name, email, country, password);
+        if (success) onClose();
       }
-      onClose();
     } finally {
       setIsLoading(false);
     }

@@ -1,6 +1,9 @@
 export type ProgrammeCategory = 'education' | 'humanitarian';
 
 export type ApplicationStatus = 
+  | 'pending'
+  | 'approved'
+  | 'rejected'
   | 'Submitted'
   | 'Under Review'
   | 'Committee Evaluation'
@@ -26,8 +29,9 @@ export interface ApplicationTimelineEvent {
 }
 
 export interface HumanitarianApplication {
-  id: string; // e.g. WHFS-2026-AF-94821
+  id: string; // e.g. WHFS-2026-ZM-94821
   userId: string;
+  name?: string;
   fullName: string;
   email: string;
   phone: string;
@@ -39,11 +43,13 @@ export interface HumanitarianApplication {
   programmeCategory: ProgrammeCategory;
   programmeName: string;
   institutionOrCommunity: string;
+  need?: string;
   financialNeedLevel: 'Critical/Emergency' | 'High Need' | 'Moderate Need';
   householdIncomeBracket: string;
   dependentsCount: number;
   displacementStatus: 'Not Displaced' | 'Internally Displaced' | 'Refugee' | 'Crisis Affected';
   statementOfNeed: string;
+  amount?: number;
   amountRequestedUSD: number;
   amountAwardedUSD?: number;
   amountRequestedLocal?: number;
@@ -54,6 +60,7 @@ export interface HumanitarianApplication {
   countryFlag?: string;
   registrationFeeUSD?: number;
   registrationFeeLocal?: string;
+  receiptImageUrl?: string;
   // Payment tracking attributes
   hasPaidRegistrationFee?: boolean;
   paymentMethod?: string;
@@ -61,6 +68,7 @@ export interface HumanitarianApplication {
   paymentStatus?: 'Paid' | 'Pending Verification' | 'Unpaid';
   paymentDate?: string;
   status: ApplicationStatus;
+  date?: string;
   documents: DocumentAttachment[];
   timeline: ApplicationTimelineEvent[];
   committeeNotes?: string;
@@ -82,6 +90,7 @@ export interface RegistrationFeePayment {
   currencySymbol: string;
   paymentMethod: string; // Airtel Money, MTN Money, Bank, M-Pesa, PayPal, etc.
   transactionReference: string;
+  receiptImageUrl?: string;
   date: string;
   status: 'Paid' | 'Pending Verification' | 'Refunded' | 'Unpaid';
   notes?: string;
