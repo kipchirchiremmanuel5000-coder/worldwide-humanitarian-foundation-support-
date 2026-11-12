@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Database
 } from 'lucide-react';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface NavbarProps {
   onOpenFirebaseModal: () => void;
@@ -96,6 +97,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenFirebaseModal, onOpenAuthM
 
           {/* Zone 3: 1 Primary Action + Auth / Admin Affordances */}
           <div className="flex items-center gap-3 shrink-0">
+            {/* PWA Install App Button */}
+            <PWAInstallButton />
+
             {/* Quick Firebase Readiness indicator button */}
             <button
               onClick={onOpenFirebaseModal}

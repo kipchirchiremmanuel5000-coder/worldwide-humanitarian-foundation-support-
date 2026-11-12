@@ -10,13 +10,19 @@ import {
   HeartHandshake,
   Users,
   Building,
-  Award
+  Award,
+  Download,
+  Smartphone
 } from 'lucide-react';
 import { IMPACT_STATISTICS } from '../data/mockData';
+import { usePWAInstall } from '../hooks/usePWAInstall';
+import { PWAInstallModal } from '../components/PWAInstallModal';
 
 export const HomePage: React.FC = () => {
   const { setActiveTab, setSelectedTrackingId, showToast } = useApp();
   const [quickSearchId, setQuickSearchId] = useState('');
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  const { isInstalled } = usePWAInstall();
 
   const handleQuickTrack = (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +75,20 @@ export const HomePage: React.FC = () => {
                   <span>Support Our Mission</span>
                 </button>
               </div>
+
+              {/* Big Install WHFS App CTA Button */}
+              {!isInstalled && (
+                <div className="pt-1">
+                  <button
+                    onClick={() => setShowInstallModal(true)}
+                    className="w-full sm:w-auto px-8 py-4 bg-[#1d4ed8] hover:bg-blue-800 active:bg-blue-900 text-white text-sm sm:text-base font-extrabold uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-blue-700/25 border-2 border-blue-400/40 cursor-pointer flex items-center justify-center gap-3"
+                  >
+                    <Smartphone className="w-5 h-5 shrink-0" />
+                    <span>INSTALL WHFS APP</span>
+                    <Download className="w-5 h-5 shrink-0" />
+                  </button>
+                </div>
+              )}
 
               {/* Quick Tracker Search Card right in Hero */}
               <div className="pt-4 max-w-lg">
@@ -463,6 +483,12 @@ export const HomePage: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* Install WHFS App Modal Popup */}
+      <PWAInstallModal
+        isOpen={showInstallModal}
+        onClose={() => setShowInstallModal(false)}
+      />
 
     </div>
   );

@@ -12,6 +12,7 @@ import { MobileBottomNav } from './components/MobileBottomNav';
 import { ToastContainer } from './components/ToastContainer';
 import { FirebaseModal } from './components/FirebaseModal';
 import { AuthModal } from './components/AuthModal';
+import { OfflineIndicator } from './components/OfflineIndicator';
 
 import { HomePage } from './pages/HomePage';
 import { AboutUsPage } from './pages/AboutUsPage';
@@ -112,6 +113,9 @@ const AppContent: React.FC = () => {
 
       {/* Floating Notification Toasts */}
       <ToastContainer />
+
+      {/* Offline PWA Status Indicator */}
+      <OfflineIndicator />
 
       {/* Firebase & Firestore Blueprint Modal */}
       <FirebaseModal 
